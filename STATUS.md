@@ -274,8 +274,12 @@ fixed (logged here, not blocking)**:
   natively, see Milestone 2), so it may have lost that hotkey "for free" by
   skipping gptokeyb2. Needs real investigation (check `oga_events`/evdev
   grab behaviour), not guessed at further yet.
-- **UI text shows in English despite Spanish (es-ES) game data; audio is
-  correctly Spanish.** Root-caused by reading `apps/d2d/load.cpp`: specific
+- **FIXED (2026-11-14, built, not yet confirmed on device): UI text shows in
+  English despite Spanish (es-ES) game data; audio is correctly Spanish.**
+  `d2d.cfg` now takes `lang = ESP` (default `ENG`), threaded through every
+  `data\local\{LNG,UI}\<lang>\` read (`overlay/patches/
+  d2d-trimui-save-lang-input.patch`). Menu labels missing under `<lang>`
+  fall back to `ENG`. Original root cause follows. Root-caused by reading `apps/d2d/load.cpp`: specific
   UI graphics (e.g. line 218, `data\local\UI\ENG\...dc6`) are **hardcoded**
   to the English locale subfolder, regardless of which language's MPQs are
   installed -- this is a real, confirmed, *undocumented* upstream d2d
@@ -322,6 +326,23 @@ at the very end of the process's life).
 - **No FPS counter exists in d2d** (only `--fps-cap`, a *limiter*, not a
   *display*) -- confirmed by grep, nothing to enable. Can't currently
   quantify a reported "rain effect feels laggy" -- noted, not measured.
+
+## TrimUI-only additions in `d2d-trimui-save-lang-input.patch` (2026-11-14)
+
+- **"Save" row in the pause menu** (`gamemenu.cpp`, `town/update.cpp`):
+  saves and closes the menu without leaving the game. Its label art is a
+  custom `data\local\UI\ENG\Save.dc6` in `trimui_save_patch.mpq` (the real
+  `patch_d2.mpq` plus that file, set via `d2d.cfg`'s `patch =`). Only ENG
+  exists, so it reads "SAVE" even with `lang = ESP`; a Spanish label is
+  not made yet.
+- **`sync()` after the save's `rename()`** (`character_store.hpp`): a save
+  that logged success was lost on a hard power-cycle because Linux hadn't
+  flushed the FAT32 SD card.
+- **Default bindings**: right trigger moved from Primary to Skill Picker.
+- **Crash handler** (`main.cpp`): dumps the faulting PC and backtrace to
+  stderr (`launcher.log`). Debug aid, TrimUI bring-up.
+- **Box art**: `overlay/assets/*-boxart.png` (640x480) go to
+  `/Imgs/PORTS/<script name>.png` on the SD.
 
 ## What hasn't been attempted at all yet
 

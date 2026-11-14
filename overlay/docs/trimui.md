@@ -103,6 +103,23 @@ cp assets/diablo2decomp-icon.png "/mnt/SDCARD/Imgs/PORTS/Diablo II Decomp.png"
 repo root for the exact non-interactive mtools incantations and the
 gotchas around `mcopy`/`mmd`'s interactive prompts.)
 
+Ready-made 640x480 art for this port and DevilutionX lives in
+`overlay/assets/*-boxart.png` (same 4:3 size as the other ports' art on the
+SD); copy them to `Imgs/PORTS/Diablo II Decomp.png` and
+`Imgs/PORTS/Devilutionx.png`.
+
+## `d2d.cfg` options added by this port (2026-11-14)
+
+- `lang = ESP` (default `ENG`): which `data\local\{LNG,UI}\<lang>\` folder
+  strings and menu art load from. Needed for a non-English install such as
+  the es-ES release; upstream always read `ENG`.
+- `patch = <path>`: an extra MPQ layered on top (used for the "Save" menu
+  label).
+
+The d2d source changes behind these (Save row, `lang`, save `sync()`, crash
+handler, default bindings) are in `overlay/patches/
+d2d-trimui-save-lang-input.patch`, applied by `scripts/apply-overlay.sh`.
+
 ## PortMaster packaging: how this was actually verified (2026-11-14)
 
 There's no public, authoritative spec doc for PortMaster's on-disk zip/

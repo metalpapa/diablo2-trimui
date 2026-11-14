@@ -46,7 +46,9 @@ for the EU interoperability basis this whole effort relies on.
 diablo2-trimui/
 ├── overlay/              Files meant to be copied into a d2decomped checkout
 │   ├── tools/trimui.sh     Cross-compile + package script (Handkit toolchain)
-│   └── docs/trimui.md      Status, risks, build/deploy instructions
+│   ├── docs/trimui.md      Status, risks, build/deploy instructions
+│   ├── patches/            Small patches onto d2decomped's own source
+│   └── assets/             Port icons and box art
 ├── scripts/
 │   └── apply-overlay.sh   Copies overlay/ onto upstream/ (or any d2decomped checkout)
 └── upstream/              git submodule: github.com/psi29a/d2decomped
