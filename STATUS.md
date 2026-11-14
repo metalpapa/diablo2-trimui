@@ -200,8 +200,8 @@ TrimUI.
 - Copying `Diablo II Decomp.zip` (or the manual folder, both already have
   real game data staged -- see below) onto a TrimUI's SD card and installing
   it via PortMaster's `autoinstall/` or a plain `Roms/PORTS/` copy.
-- A fresh-machine/fresh-clone dry run of the whole pipeline end to end.
-- Submitting the FFmpeg/sysctl fix upstream to `psi29a/d2decomped` as a PR.
+- Submitting the FFmpeg/sysctl fix upstream to `psi29a/d2decomped` as a PR
+  (and the `--update-lock` gotcha to `code-beans/handkit`, see Milestone 3).
 - Optional, low-priority polish: a placeholder (non-Blizzard) icon +
   `gameinfo.xml` for a nicer Ports-menu listing; this doesn't block
   installing or launching.
@@ -287,20 +287,56 @@ well under a minute once OpenAL/zlib/bzip2/FFmpeg's install markers exist.
 
 ## Resuming on a fresh machine (if this one/its /tmp is gone)
 
+**Verified end to end this session** (2026-11-14): cloned fresh to `/tmp`,
+ran the steps below exactly, got a clean `d2d` build and `trimui-pak/`
+(incl. `Diablo II Decomp.zip`) with zero actual errors -- see Milestone 3
+below for the one gotcha this surfaced and fixed in step 4.
+
 ```sh
 git clone --recurse-submodules https://github.com/metalpapa/diablo2-trimui.git
 cd diablo2-trimui
 brew install cmake ninja conan
 conan profile detect --force
 ./scripts/apply-overlay.sh
+cd vendor/handkit && ./tools/handkit configure --update-lock && cd ../..
 export HANDKIT_SDK=$PWD/vendor/handkit
-# see vendor/handkit.conan.lock and its own ./tools/handkit configure
 cd upstream && ./tools/trimui.sh all
 ```
 
 (Handkit's Conan packages aren't vendored as binaries — only their
 *sources* are, in `vendor/sources/` — so a fresh machine's first build still
 compiles Zig/SDL3 from those vendored sources, not downloads them again.)
+
+## Milestone 3: fresh-machine dry run, actually done (2026-11-14)
+
+STATUS.md has claimed a "Resuming on a fresh machine" recipe since early in
+this project, but it had never actually been run -- it was reasoned out, not
+tested. This session finally did it: `git clone --recurse-submodules` into
+a brand new `/tmp` directory (no shared build cache, no pre-existing Conan
+packages beyond what's in `~/.conan2`'s global cache from other projects),
+followed the documented steps, and got a clean `./tools/trimui.sh all` with
+a working `d2d` binary and `trimui-pak/` -- confirming VERSIONS.md/STATUS.md
+aren't just "should work" but actually do.
+
+**One real bug found and fixed by doing this**: the documented fresh-machine
+recipe said `./tools/handkit configure` (no flags), which **fails** on a
+truly fresh machine with `ERROR: Package 'handkit/0.4.0' not resolved` --
+Handkit's own committed `vendor/handkit/conan.lock` pins exact Conan package
+revisions, but a freshly re-exported local recipe gets a new revision hash
+that doesn't match the lockfile's expectation (Handkit's own `tools/handkit`
+script only passes `--lockfile=` to bypass this when `conan.lock` doesn't
+exist yet or `--update-lock` is passed -- since the lockfile *does* already
+exist in the repo, neither condition was true). Fixed by adding
+`--update-lock` to the documented command above. This is a Handkit-side
+quirk, not something to patch in this repo, but worth flagging upstream to
+code-beans/handkit too (their own `configure` subcommand's default behavior
+arguably shouldn't require a flag most first-time users wouldn't know to add).
+
+Also logged for completeness, not a bug: two harmless `CMake Error... Test
+X - Failed` lines appeared during the build (`HAVE_WNO_INTERFERENCE_SIZE`,
+`HAVE_MSSE2_SWITCH`) -- normal CMake compiler-flag feature probes that don't
+apply to this toolchain/target, not actual failures. No `FAILED`/real
+`error:` lines anywhere else in the full build log.
 
 ## Everything described here is already committed/pushed
 
