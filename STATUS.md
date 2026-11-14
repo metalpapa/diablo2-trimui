@@ -204,6 +204,11 @@ TrimUI.
   it via PortMaster's `autoinstall/` or a plain `Roms/PORTS/` copy.
 - Submitting the FFmpeg/sysctl fix upstream to `psi29a/d2decomped` as a PR
   (and the `--update-lock` gotcha to `code-beans/handkit`, see Milestone 3).
+  Not done without asking first: filing issues/PRs on someone else's repo
+  under the user's identity is more consequential than a local commit.
+- A real Linux (not macOS) save/reload check via
+  `tools/validate-linux.Dockerfile` (needs `docker` on this machine first) --
+  see Milestone 4's "Tried and stopped short".
 
 ## Reference material available locally (found this session)
 
@@ -400,6 +405,26 @@ view is a fixed 800x600 (4:3), pillarboxed on the Smart Pro/Brick's 16:9
 ("the world draws on the wide buffer around its centre; the HUD and panels
 run unchanged") made exactly for this. Re-validated with
 `harbourmaster.captain.check_port()` after the change: still parses clean.
+
+**Tried and stopped short**: wanted to also confirm the launcher's
+`export HOME="$GAMEDIR"` (so `d2d.cfg`/saves land beside the binary, not a
+real user's home) actually produces a save file, end to end. On macOS,
+d2d ignores `$HOME`/`XDG_CONFIG_HOME` entirely and always uses
+`~/Library/Preferences/d2d` (confirmed: `--start-screen charcreate` +
+`quit` over devctl logged `ok` but wrote nothing under a test
+`XDG_CONFIG_HOME`) -- that's correct, expected macOS-native behavior, not a
+bug, but it means this specific check needs real Linux to mean anything.
+`tools/validate-linux.Dockerfile` in this repo is exactly the right
+environment for it (same `HOME`/`~/.config` logic TrimUI's Linux userspace
+uses), but this machine has no `docker` installed, so this wasn't finished.
+Low priority: Linux's `HOME`-based config path is standard, long-tested by
+upstream's own Linux CI job, and not something this port changes --
+unlike the engine+data question above, there was little reason to expect
+it to behave differently here. If `docker` ever gets installed on this
+machine, re-run roughly: `docker build -t d2d-test -f tools/validate-linux.Dockerfile tools/`,
+then inside a container with that image, build d2d and run the
+charcreate+quit cycle above with a real `$HOME` override and check for a
+`.d2s` file under `$HOME/.config/d2d/save/`.
 
 ## Everything described here is already committed/pushed
 
