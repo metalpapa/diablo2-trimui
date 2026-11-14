@@ -7,9 +7,11 @@ before re-reading chat history.
 **This machine (the one this was built on) already has everything installed**
 to resume immediately: Homebrew, `cmake`, `ninja`, `conan` 2.34, `llvm`
 (for a spare `clang-scan-deps`, no longer actually needed — see below), a
-cloned+configured Handkit at `/tmp/d2port/handkit`, and a cloned
-`diablo2-trimui` working copy at `/tmp/d2port/diablo2-trimui` whose `origin`
-is already `https://github.com/metalpapa/diablo2-trimui.git`. If this exact
+cloned+configured Handkit at `~/Documents/handkit`, and a cloned
+`diablo2-trimui` working copy at `~/Documents/diablo2-trimui` whose `origin`
+is already `https://github.com/metalpapa/diablo2-trimui.git` (moved here
+from `/tmp/d2port/...` on 2026-11-14 so it's visible in Finder/Documents
+instead of living only in a temp dir that can get swept). If this exact
 machine/session is gone, "Resuming on a fresh machine" below has the from-
 scratch steps.
 
@@ -124,11 +126,11 @@ VERSIONS.md, so prefer a configure flag).
 ## Resume commands (same machine)
 
 ```sh
-cd /tmp/d2port/diablo2-trimui
+cd ~/Documents/diablo2-trimui
 ./scripts/apply-overlay.sh         # re-copy the latest overlay/tools/trimui.sh into upstream/
 cd upstream
-export HANDKIT_SDK=/tmp/d2port/handkit
-./tools/trimui.sh build 2>&1 | tee /tmp/d2port/trimui-build-resume.log
+export HANDKIT_SDK=~/Documents/handkit
+./tools/trimui.sh build 2>&1 | tee ~/Documents/trimui-build-resume.log
 ```
 
 The build is incremental (Ninja + cached Conan packages): OpenAL, zlib,
