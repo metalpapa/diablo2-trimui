@@ -31,7 +31,12 @@ el agente), no solo QUÉ aprendimos del dispositivo.
   **borrar el destino antes de copiar** (`sudo mdel ...; sudo mcopy ...`)
   en vez de confiar en `-o`/`-n`, y redirigir `stdin` desde `/dev/null` en
   el `mcopy` como cinturón y tirantes (`</dev/null` al final del comando).
-
+  `mmd` (crear carpeta) tiene el mismo problema si la carpeta YA existe
+  ("Long file name already exists" + un menú a)utorename/r)ename/s)kip que
+  también queda enterrado) y `</dev/null` ahí NO alcanza (mtools repregunta
+  en loop silencioso — parece colgado pero está gastando CPU). Solución:
+  no llamar `mmd` a ciegas, primero `mdir` esa ruta y recién si falla (no
+  existe) ahí sí crearla: `mdir ... >/dev/null 2>&1 || mmd ...`.
 ## Flujo de trabajo con el agente (por qué lo hacemos así)
 
 Patrón que usamos TODA la sesión para no depender de copiar/pegar texto de
@@ -157,14 +162,34 @@ Reverse-engineered leyendo el `harbourmaster` real que viene en CrossMix OS
   `Roms/PORTS/` con mtools. CrossMix, NextUI, muOS y knulli escanean esa
   carpeta igual, sin pasar por PortMaster para nada.
 
-## Pendiente / no confirmado todavía
+## Carátulas/preview en el menú de Ports (RESUELTO)
 
-- **Carátulas/preview en el menú de Ports**: todavía no sabemos con certeza
-  qué convención usa CrossMix OS para mostrar una imagen linda en la lista
-  de Ports (¿`Roms/PORTS/Imgs/<nombre>.png`? ¿algo del propio
-  `port.json`/`gameinfo.xml`?). Ninguno de los dos ports de Diablo que
-  probamos tiene esto resuelto. Si se investiga, documentar acá el
-  resultado.
+Ni `port.json`'s `attr.image` ni un `gameinfo.xml` adentro de la carpeta del
+port sirven para esto en CrossMix OS — confirmado comparando con DevilutionX
+(un port real que ya andaba bien y tampoco tenía ninguno de los dos).
+
+La convención real se encontró leyendo **`Roms/PORTS/PORTS_cache7.db`**
+(una base SQLite que arma el propio frontend al escanear esa carpeta —
+tabla `PORTS_roms`, columna `imgpath`): la imagen va en
+
+```
+/Imgs/PORTS/<Nombre exacto del .sh sin extensión>.png
+```
+
+**en la raíz de la SD**, no adentro de `Roms/`. Por ejemplo, para
+`Roms/PORTS/Diablo II Decomp.sh` la imagen tiene que estar en
+`/Imgs/PORTS/Diablo II Decomp.png`. Confirmado 100%: un port ajeno con
+icono real ("Celeste Classic") ya tenía su `.png` ahí mismo. No hace falta
+tocar `port.json` ni ningún XML — ni siquiera reiniciar PortMaster, solo
+reiniciar la consola para que el frontend vuelva a leer la carpeta.
+
+```sh
+# Crear la carpeta solo si no existe (mmd pregunta algo sin salida visible
+# si ya existe, y esa pregunta cuelga cualquier script con output a log)
+sudo mdir -i /dev/rdisk14s1 "::/Imgs" >/dev/null 2>&1 || sudo mmd -i /dev/rdisk14s1 "::/Imgs" </dev/null
+sudo mdir -i /dev/rdisk14s1 "::/Imgs/PORTS" >/dev/null 2>&1 || sudo mmd -i /dev/rdisk14s1 "::/Imgs/PORTS" </dev/null
+sudo mcopy -i /dev/rdisk14s1 /ruta/a/icono.png "::/Imgs/PORTS/Nombre Del Port.png" </dev/null
+```
 
 ## Debuggeando crashes sin herramientas de verdad en la consola
 
