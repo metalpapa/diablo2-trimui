@@ -1,3 +1,6 @@
 [submodule "upstream"]
 	path = upstream
 	url = https://github.com/psi29a/d2decomped.git
+[submodule "vendor/handkit"]
+	path = vendor/handkit
+	url = https://github.com/code-beans/handkit.git

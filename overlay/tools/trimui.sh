@@ -29,6 +29,34 @@ build=build/trimui
 out=build/trimui-pak
 : "${HANDKIT_SDK:?clone and run \`./tools/handkit configure\` in https://github.com/code-beans/handkit, then export HANDKIT_SDK=<that checkout>}"
 
+# Frozen dependency sources (diablo2-trimui/VERSIONS.md). This script is
+# normally run from an overlay applied onto a d2decomped checkout that sits
+# directly under the diablo2-trimui repo (scripts/apply-overlay.sh), so
+# ../vendor/sources is where the pinned tarballs live. TRIMUI_VENDOR_DIR
+# overrides this (e.g. when trimui.sh is run from somewhere else); if
+# neither has the file, this script falls back to downloading it.
+vendor_dir=${TRIMUI_VENDOR_DIR:-$PWD/../vendor/sources}
+
+# OpenAL Soft is pinned to 1.24.3, not the newer 1.25.x d2decomped's own
+# tools/d2vita.sh uses for the Switch build: 1.25.x compiles some of its own
+# internals as real C++20 named modules (FILE_SET CXX_MODULES), which needs
+# a clang-scan-deps that understands Zig's cross-compiler output and that
+# neither Zig 0.14.1 nor a plain CMake setup provides out of the box here.
+# 1.24.3 has no such dependency and is otherwise the same library/API.
+
+sha256_check() {   # file sha256
+    # Computes and compares by hand: BSD sha256sum (macOS's /sbin/sha256sum)
+    # and GNU sha256sum take the "-c" check flag differently, and not every
+    # system has both tools.
+    local actual
+    if command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$1" | cut -d' ' -f1)
+    else
+        actual=$(sha256sum "$1" | cut -d' ' -f1)
+    fi
+    [[ $actual == "$2" ]] || { echo "trimui.sh: $1: expected sha256 $2, got $actual" >&2; exit 1; }
+}
+
 trimui_configure() {
     # A throwaway Conan project that depends on handkit-sdl (SDL3 + the
     # PowerVR/Mali display backend) and handkit-toolchain (the pinned Zig
@@ -39,7 +67,8 @@ trimui_configure() {
     mkdir -p "$deps"
     cat > "$deps/conanfile.txt" <<'EOF'
 [requires]
-handkit-sdl/0.4.0
+handkit-sdl/3.2.10
+[tool_requires]
 handkit-toolchain/0.14.1
 [generators]
 CMakeDeps
@@ -64,29 +93,143 @@ trimui_build() {
     # into $alsoft against the same toolchain and SDL3.
     alsoft=$PWD/$build/openal-deps
     if [[ ! -f $alsoft/lib/libopenal.a ]]; then
-        fetch_dir=$build/openal-src
+        fetch_dir=$build/openal-src-1.24.3
         if [[ ! -d $fetch_dir ]]; then
             mkdir -p "$build"
-            curl -fsSLo "$build/openal-soft.tar.gz" \
-                https://github.com/kcat/openal-soft/archive/refs/tags/1.25.2.tar.gz
-            echo "fb27e5839aa11f0e5b9d33756965291fad5d6909ab928ea1f796f4a1a6877894  $build/openal-soft.tar.gz" | sha256sum -c --quiet
+            if [[ -f $vendor_dir/openal-soft-1.24.3.tar.gz ]]; then
+                cp "$vendor_dir/openal-soft-1.24.3.tar.gz" "$build/openal-soft.tar.gz"
+            else
+                curl -fsSLo "$build/openal-soft.tar.gz" \
+                    https://github.com/kcat/openal-soft/archive/refs/tags/1.24.3.tar.gz
+            fi
+            sha256_check "$build/openal-soft.tar.gz" 7e1fecdeb45e7f78722b776c5cf30bd33934b961d7fd2a11e0494e064cc631ce
             mkdir -p "$fetch_dir.part" && tar -xzf "$build/openal-soft.tar.gz" -C "$fetch_dir.part" --strip-components=1
             mv "$fetch_dir.part" "$fetch_dir"
         fi
-        cmake -S "$fetch_dir" -B "$build/openal-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        cmake --fresh -S "$fetch_dir" -B "$build/openal-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$toolchain" -DCMAKE_INSTALL_PREFIX="$alsoft" \
+            -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
             -DSDL3_DIR="$sdl3_dir" -DLIBTYPE=STATIC \
             -DALSOFT_BACKEND_SDL3=ON -DALSOFT_REQUIRE_SDL3=ON \
             -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF
-        cmake --build "$build/openal-build" --target install
+cmake --build "$build/openal-build" --target install
     fi
 
-    cmake -S . -B "$build/d2d" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    # zlib and bzip2: StormLib (bundled by D2D_BUNDLED_STORMLIB) and
+    # components/screenshot both need them, and nothing above provides them
+    # for the target. zlib ships its own CMakeLists.txt; bzip2's upstream
+    # tarball doesn't, so a tiny one is written into its source tree here.
+    zbz=$PWD/$build/zbz-deps
+    if [[ ! -f $zbz/lib/libz.a ]]; then
+        zlib_src=$build/zlib-1.3.1
+        if [[ ! -d $zlib_src ]]; then
+            if [[ -f $vendor_dir/zlib-1.3.1.tar.gz ]]; then
+                cp "$vendor_dir/zlib-1.3.1.tar.gz" "$build/zlib.tar.gz"
+            else
+                curl -fsSLo "$build/zlib.tar.gz" https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+            fi
+            sha256_check "$build/zlib.tar.gz" 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+            mkdir -p "$zlib_src.part" && tar -xzf "$build/zlib.tar.gz" -C "$zlib_src.part" --strip-components=1
+            mv "$zlib_src.part" "$zlib_src"
+        fi
+        cmake --fresh -S "$zlib_src" -B "$build/zlib-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain" -DCMAKE_INSTALL_PREFIX="$zbz" \
+            -DBUILD_SHARED_LIBS=OFF -DZLIB_BUILD_EXAMPLES=OFF
+        cmake --build "$build/zlib-build" --target zlibstatic
+        cmake --install "$build/zlib-build" --component Development 2>/dev/null || true
+        # zlib's install target also tries to install the shared lib target,
+        # which this static-only configure never built; copy by hand instead.
+        mkdir -p "$zbz/lib" "$zbz/include"
+        cp "$build/zlib-build"/libz.a "$zbz/lib/" 2>/dev/null || cp "$build/zlib-build"/libzlibstatic.a "$zbz/lib/libz.a"
+        cp "$zlib_src"/zlib.h "$build/zlib-build"/zconf.h "$zbz/include/"
+    fi
+    if [[ ! -f $zbz/lib/libbz2.a ]]; then
+        bz2_src=$build/bzip2-1.0.8
+        if [[ ! -d $bz2_src ]]; then
+            if [[ -f $vendor_dir/bzip2-1.0.8.tar.gz ]]; then
+                cp "$vendor_dir/bzip2-1.0.8.tar.gz" "$build/bzip2.tar.gz"
+            else
+                curl -fsSLo "$build/bzip2.tar.gz" https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+            fi
+            sha256_check "$build/bzip2.tar.gz" ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
+            mkdir -p "$bz2_src.part" && tar -xzf "$build/bzip2.tar.gz" -C "$bz2_src.part" --strip-components=1
+            mv "$bz2_src.part" "$bz2_src"
+            # Upstream bzip2 1.0.8 ships only a Makefile; this is the whole
+            # library (7 files, per its own Makefile's $(OBJS)) as a CMake target.
+            cat > "$bz2_src/CMakeLists.txt" <<'EOF'
+cmake_minimum_required(VERSION 3.10)
+project(bz2 C)
+add_library(bz2 STATIC
+    blocksort.c huffman.c crctable.c randtable.c
+    compress.c decompress.c bzlib.c)
+target_include_directories(bz2 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+install(TARGETS bz2 ARCHIVE DESTINATION lib)
+install(FILES bzlib.h DESTINATION include)
+EOF
+        fi
+        cmake --fresh -S "$bz2_src" -B "$build/bzip2-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain" -DCMAKE_INSTALL_PREFIX="$zbz"
+        cmake --build "$build/bzip2-build" --target install
+    fi
+
+    # FFmpeg's own ExternalProject (apps/d2d/CMakeLists.txt) downloads its
+    # source itself; D2D_FFMPEG_SOURCE_DIR points it at the vendored,
+    # checksum-pinned copy instead, when there is one (VERSIONS.md).
+    ffmpeg_args=()
+    if [[ -f $vendor_dir/ffmpeg-9.0.2.tar.xz ]]; then
+        ffmpeg_src=$build/ffmpeg-9.0.2
+        if [[ ! -d $ffmpeg_src ]]; then
+            mkdir -p "$ffmpeg_src.part"
+            tar -xJf "$vendor_dir/ffmpeg-9.0.2.tar.xz" -C "$ffmpeg_src.part" --strip-components=1
+            mv "$ffmpeg_src.part" "$ffmpeg_src"
+        fi
+        ffmpeg_args=(-DD2D_FFMPEG_SOURCE_DIR="$ffmpeg_src")
+    fi
+
+    # CLI11 is normally FetchContent'd by git from GitHub (root CMakeLists.txt);
+    # FETCHCONTENT_SOURCE_DIR_CLI11 points it at the vendored tarball instead.
+    cli11_args=()
+    if [[ -f $vendor_dir/cli11-2.6.2.tar.gz ]]; then
+        cli11_src=$build/cli11-2.6.2
+        if [[ ! -d $cli11_src ]]; then
+            mkdir -p "$cli11_src.part"
+            tar -xzf "$vendor_dir/cli11-2.6.2.tar.gz" -C "$cli11_src.part" --strip-components=1
+            mv "$cli11_src.part" "$cli11_src"
+        fi
+        cli11_args=(-DFETCHCONTENT_SOURCE_DIR_CLI11="$cli11_src")
+    fi
+
+    # Conan's toolchain file sets CMAKE_CXX_STANDARD 17 as a plain (non-cache)
+    # variable, from the Handkit profile's compiler.cppstd=17 (what SDL3 and
+    # OpenAL need). A plain set() shadows -DCMAKE_CXX_STANDARD=23 and
+    # d2decomped's own "if(NOT DEFINED CMAKE_CXX_STANDARD)" guard
+    # (root CMakeLists.txt), so d2d itself would silently compile as C++17
+    # and fail on <span>, unordered_set::contains, etc. This wrapper
+    # includes Conan's toolchain, then raises the standard back to what
+    # d2decomped actually requires.
+    d2d_toolchain="$build/d2d-toolchain.cmake"
+    cat > "$d2d_toolchain" <<EOF
+include("$toolchain")
+set(CMAKE_CXX_STANDARD 23)
+EOF
+
+    # D2D_WERROR=OFF: sanctioned escape hatch (CONTRIBUTING.md/CMakeLists.txt)
+    # for a toolchain surfacing a warning upstream hasn't audited. Here it's
+    # Conan's generated toolchain passing an explicit -stdlib=libc++ that
+    # Zig's cross driver already defaults to and then reports unused;
+    # harmless, but d2decomped's own code treats warnings as errors.
+    cmake --fresh -S . -B "$build/d2d" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DD2D_GAME_ONLY=ON -DD2D_BUNDLED_STORMLIB=ON -DD2D_BUNDLED_FFMPEG=ON \
-        -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
+        -DD2D_WERROR=OFF \
+        -DCMAKE_TOOLCHAIN_FILE="$d2d_toolchain" \
+        -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
         -DSDL3_DIR="$sdl3_dir" \
         -DOPENAL_INCLUDE_DIR="$alsoft/include" \
-        -DOPENAL_LIBRARY="$alsoft/lib/libopenal.a"
+        -DOPENAL_LIBRARY="$alsoft/lib/libopenal.a" \
+        -DZLIB_LIBRARY="$zbz/lib/libz.a" -DZLIB_INCLUDE_DIR="$zbz/include" \
+        -DBZIP2_LIBRARIES="$zbz/lib/libbz2.a" -DBZIP2_LIBRARY="$zbz/lib/libbz2.a" \
+        -DBZIP2_LIBRARY_RELEASE="$zbz/lib/libbz2.a" -DBZIP2_INCLUDE_DIR="$zbz/include" \
+        "${ffmpeg_args[@]}" "${cli11_args[@]}"
     cmake --build "$build/d2d" --target d2d
 }
 
