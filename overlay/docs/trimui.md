@@ -107,10 +107,10 @@ Key findings:
   (`PortMaster.sh`'s own "Autoinstallation Code") — this is the "I didn't
   have to do anything else, it just showed up in the ports catalog"
   experience other ports (DevilutionX, etc.) already give on this device.
-- No icon/art yet (would need placeholder, non-Blizzard art — real D2 art
-  can't ship per LEGAL.md). `attr.title`/`attr.desc` from `port.json` cover
-  PortMaster's own menu text without it; a `gameinfo.xml` + `.png` would
-  still improve the OS-level Ports-menu listing later.
+- `attr.title`/`attr.desc`/`attr.inst` from `port.json`, plus a plain
+  placeholder icon (`assets/diablo2decomp-icon.png` — a generic "D2"
+  monogram, no Blizzard art per LEGAL.md) and a `gameinfo.xml`, give the
+  Ports menu a real title/icon instead of a bare filename.
 
 ## Not there yet (first things to find out on real hardware)
 
@@ -123,8 +123,8 @@ Key findings:
   run on the device confirms it.
 - Network (LAN/TCP·IP join) is expected to work — this is real Linux, not
   a sandboxed console SDK like the Vita/Switch builds — but is untested here.
-- No icon/art for the ports menu (PortMaster packaging metadata itself is
-  now done and verified against real PortMaster code -- see above).
+- No real icon/art (a plain placeholder is included — see above — but
+  nothing using actual D2 assets, which LEGAL.md rules out anyway).
 - Audio backend is SDL3's through Handkit's build; OpenAL Soft's SDL3
   backend on it is untested beyond compiling.
 

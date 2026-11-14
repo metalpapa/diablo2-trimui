@@ -180,10 +180,8 @@ inline in `trimui_package()`):
    confirmed straight from `PortMaster.sh`'s own "Autoinstallation Code"
    section, not inferred.
 
-**Still not there**: no icon/art (would need placeholder, non-Blizzard
-art -- `LEGAL.md` rules out anything using real D2 assets) and no
-`gameinfo.xml` for a nicer Ports-menu listing. Low priority: `port.json`'s
-`title`/`desc` already cover PortMaster's own in-app listing without it.
+**Still not there**: nothing blocking, genuinely cosmetic only -- a nicer
+(non-placeholder) icon if someone wants to commission/draw one later.
 
 **Not done, and can't be done without hardware**: actually running the
 install. Everything above is "PortMaster's own code says this is a valid,
@@ -202,9 +200,6 @@ TrimUI.
   it via PortMaster's `autoinstall/` or a plain `Roms/PORTS/` copy.
 - Submitting the FFmpeg/sysctl fix upstream to `psi29a/d2decomped` as a PR
   (and the `--update-lock` gotcha to `code-beans/handkit`, see Milestone 3).
-- Optional, low-priority polish: a placeholder (non-Blizzard) icon +
-  `gameinfo.xml` for a nicer Ports-menu listing; this doesn't block
-  installing or launching.
 
 ## Reference material available locally (found this session)
 

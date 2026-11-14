@@ -291,6 +291,30 @@ EOF
 }
 EOF
 
+    # A placeholder icon (plain "D2" monogram, no Blizzard art -- LEGAL.md
+    # rules that out) plus an ES-style gameinfo.xml so CrossMix's Ports menu
+    # shows something other than the raw filename. Paths inside gameinfo.xml
+    # are relative to the *shared* ports root (where both this .sh and this
+    # whole directory live as siblings), not to gameinfo.xml's own location
+    # -- confirmed by reading platform.py's gamelist_add(), which resolves
+    # both <path> and <image> against self.hm.scripts_dir/ports_dir, never
+    # the gameinfo.xml file's own directory.
+    icon_src="$PWD/../overlay/assets/diablo2decomp-icon.png"
+    if [[ -f $icon_src ]]; then
+        cp "$icon_src" "$pak/diablo2decomp-icon.png"
+        cat > "$pak/gameinfo.xml" <<EOF
+<?xml version="1.0"?>
+<gameList>
+    <game>
+        <path>./Diablo II Decomp.sh</path>
+        <name>Diablo II Decomp</name>
+        <desc>D2Decomp's open-source reimplementation of Diablo II + Lord of Destruction, cross-compiled for the TrimUI via Handkit. Experimental.</desc>
+        <image>./Diablo II Decomp/diablo2decomp-icon.png</image>
+    </game>
+</gameList>
+EOF
+    fi
+
     # The launcher: PortMaster's own generic controlfolder-detection
     # (verbatim from its PortMaster.sh), so this works whether launched by
     # PortMaster itself, dropped straight into Roms/PORTS without it, or
