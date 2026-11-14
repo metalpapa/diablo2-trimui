@@ -1,0 +1,24 @@
+diff --git a/apps/d2d/window.hpp b/apps/d2d/window.hpp
+index 067a4a08..854ca75e 100644
+--- a/apps/d2d/window.hpp
++++ b/apps/d2d/window.hpp
+@@ -68,8 +68,18 @@ struct Window {
+         // high-DPI so the renderer picks up the true screen scale.
+         SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
+         view_w = width_;
++        // Handkit's SDL video driver (TrimUI) only creates an OpenGL ES or
++        // Vulkan window -- it has no software/framebuffer path -- so a
++        // window without either flag fails there with "handkit: requires an
++        // OpenGL ES or Vulkan window" (confirmed on real Smart Pro hardware).
++        // Elsewhere SDL_CreateRenderer(window, nullptr) already auto-picks
++        // whatever backend fits the window, so asking for a GL-capable
++        // window only under Handkit doesn't change any other platform.
++        const char* video_driver = SDL_GetCurrentVideoDriver();
++        const bool  needs_gl     = video_driver != nullptr && SDL_strcmp(video_driver, "handkit") == 0;
+         window = SDL_CreateWindow("d2d", (window_width > 0 ? window_width : width_) * scale, height_ * scale,
+-                                  SDL_WINDOW_HIGH_PIXEL_DENSITY | (fullscreen ? SDL_WINDOW_FULLSCREEN : 0) | (resizable ? SDL_WINDOW_RESIZABLE : 0));
++                                  SDL_WINDOW_HIGH_PIXEL_DENSITY | (needs_gl ? SDL_WINDOW_OPENGL : 0) |
++                                  (fullscreen ? SDL_WINDOW_FULLSCREEN : 0) | (resizable ? SDL_WINDOW_RESIZABLE : 0));
+         if (!window) { d2d::log::error("SDL_CreateWindow: {}", SDL_GetError()); return false; }
+         set_icon(window);
+         // The launcher quits as it starts us: take the foreground it leaves

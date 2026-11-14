@@ -193,6 +193,104 @@ installable, compatible port" -- which is much stronger evidence than
 before, but still not the same as a confirmed install + launch on a real
 TrimUI.
 
+## Milestone 3: first real boot on actual TrimUI hardware (2026-11-14)
+
+The user had a real TrimUI (Smart Pro/Brick, CrossMix OS) connected over USB.
+Mac's corporate policy blocks writing to mounted USB volumes, so the whole
+session wrote to the SD card's **raw device** (`/dev/rdiskNsN`, after
+`diskutil unmount`) via Homebrew's `mtools` (`mdir`/`mcopy`/`mmove`/`mmd`),
+never a normal mount. User ran every privileged command themselves in their
+own Terminal (scripts redirect output to `/tmp/*.log` for the agent to read
+back directly, since there's no TTY for `sudo` from this session otherwise).
+
+**Found and fixed four real bugs, all by reading this exact device's own
+real, already-working files (CrossMix's `control.txt`, a working
+`Devilutionx.sh`, Handkit's own video driver source, and d2d's own source)
+instead of guessing:**
+
+1. **Wrong `Roms/PORTS` layout.** Initially assumed a self-contained
+   `Roms/PORTS/Diablo II Decomp.sh` + `Roms/PORTS/Diablo II Decomp/` (binary
+   + data together) -- the generic PortMaster convention. **Wrong for this
+   device**: reading a real, working `Devilutionx.sh` off the SD showed
+   `Roms/PORTS/*.sh` is only a thin launcher stub; the actual game folder
+   lives at a **fixed, separate path**, `/mnt/SDCARD/Data/ports/<name>/`
+   (`control.txt`'s `directory="mnt/SDCARD/Data"` + `/ports/<name>`).
+   Likely why the first real launch attempt just silently closed instantly.
+   Fixed: `GAMEDIR` in the generated `.sh` is now the fixed absolute path
+   `/mnt/SDCARD/Data/ports/diablo2decomp` (not `$(dirname "$0")/...`).
+   Manual-copy instructions now say to copy the `.sh` to `Roms/PORTS/` and
+   the folder's **contents** to `Data/ports/diablo2decomp/` separately.
+   **Not yet re-verified for the PortMaster-autoinstall `.zip` path** --
+   `harbourmaster`'s `PlatformTrimUI` code moves things around on install
+   too (`platform.py`'s `add_port_script`/`trimui-port-mode` config), unclear
+   if it lands in the exact same place; only the manual-copy path has been
+   hardware-tested so far.
+2. **Handkit requires an OpenGL ES/Vulkan window, always.** Real crash log
+   (`.config/d2d/d2d.log`, pulled off the SD): `SDL_CreateWindow: handkit:
+   requires an OpenGL ES or Vulkan window`. Confirmed in Handkit's own
+   source (`sdl_handkit_video.c`'s `HkCreateWindow`): it rejects any window
+   without `SDL_WINDOW_OPENGL`/`SDL_WINDOW_VULKAN` -- no software/framebuffer
+   path exists at all. d2d's `window.hpp` created a plain window (fine on
+   every other platform, where `SDL_CreateRenderer(window, nullptr)` picks
+   software automatically). Fixed with a new overlay patch,
+   `overlay/patches/d2d-handkit-gl-window.patch`: adds `SDL_WINDOW_OPENGL`
+   to the window's flags **only** when `SDL_GetCurrentVideoDriver()` returns
+   `"handkit"`, so every other platform is untouched. This is a genuine
+   upstream-worthy fix (small, additive, well-justified) -- same spirit as
+   the FFmpeg sysctl patch.
+3. **No on-screen keyboard under Handkit.** Character creation needs to type
+   a name (`SDL_StartTextInput`); confirmed by grep that Handkit has no
+   on-screen-keyboard implementation at all (d2d's own comment: "A Steam
+   Deck has no keyboard: SDL_StartTextInput opens Steam's own [OSK]" --
+   Handkit has nothing equivalent). The game would hang on that screen with
+   no way to type and no way to back out (see bug #4). Worked around, not
+   fixed: the generated launcher now checks if `$GAMEDIR/.config/d2d/save/`
+   is empty, and if so passes d2d's own `--start-screen charcreate
+   --start-class 0 --start-name Kain` (same flags d2d already documents for
+   Steam Deck/console builds) to auto-create one character with no typing.
+   Every later launch sees that save and goes to the normal, gamepad-only
+   character-select screen. A real on-screen keyboard (in Handkit, or a
+   gamepad-driven one in d2d itself) is the actual fix, not attempted here.
+4. **No visible error on crash at all.** This frontend shows nothing on
+   screen if the launched game exits early -- the first crash (bug #1) was
+   invisible, "it just closed," with no on-screen message. The only reason
+   it was diagnosable at all was pulling `.config/d2d/d2d.log` off the raw
+   SD card after the fact. Fixed going forward: the launcher now redirects
+   `./d2d ...` to `$GAMEDIR/launcher.log` (stdout+stderr), alongside d2d's
+   own log, for next time.
+
+**Confirmed working on real hardware after the fixes above**: the game
+boots, loads all MPQs, builds the world (Blood Moor), renders on screen,
+auto-creates a character, and is playable with a controller.
+
+**Two known issues found during this same real-hardware session, not yet
+fixed (logged here, not blocking)**:
+
+- **Menu+Start doesn't exit the game** (the usual PortMaster hotkey combo);
+  user has to power off the console. Not yet root-caused with certainty, but
+  the leading theory: that combo is commonly implemented by `gptokeyb`/
+  `gptokeyb2` watching for it and killing the game process -- and this port
+  deliberately doesn't run gptokeyb2 at all (d2d reads SDL3 gamepad input
+  natively, see Milestone 2), so it may have lost that hotkey "for free" by
+  skipping gptokeyb2. Needs real investigation (check `oga_events`/evdev
+  grab behaviour), not guessed at further yet.
+- **UI text shows in English despite Spanish (es-ES) game data; audio is
+  correctly Spanish.** Root-caused by reading `apps/d2d/load.cpp`: specific
+  UI graphics (e.g. line 218, `data\local\UI\ENG\...dc6`) are **hardcoded**
+  to the English locale subfolder, regardless of which language's MPQs are
+  installed -- this is a real, confirmed, *undocumented* upstream d2d
+  limitation (not a packaging bug, not fixable by swapping game files).
+  Spoken audio and most string-table-driven text (quest text, etc., sourced
+  by ID from `string.tbl`, not hardcoded to ENG) should still be correctly
+  Spanish; only specific baked-in UI art uses the hardcoded path. Properly
+  fixing this means detecting the installed locale dynamically (probe which
+  `data\local\UI\<LANG>\` subfolder actually exists in the loaded MPQs) and
+  threading that through every hardcoded `ENG`/`LATIN` path -- a real, non-
+  trivial upstream fix, not attempted tonight.
+- **No FPS counter exists in d2d** (only `--fps-cap`, a *limiter*, not a
+  *display*) -- confirmed by grep, nothing to enable. Can't currently
+  quantify a reported "rain effect feels laggy" -- noted, not measured.
+
 ## What hasn't been attempted at all yet
 
 - **Anything on real TrimUI hardware**: display, audio, controls,

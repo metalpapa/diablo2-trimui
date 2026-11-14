@@ -327,8 +327,14 @@ EOF
 # PortMaster port script for Diablo II Decomp (d2d).
 # https://github.com/metalpapa/diablo2-trimui -- see README-trimui.txt for
 # first-run setup (you supply your own, legally owned game files).
-
-GAMEDIR="$(dirname "$0")/Diablo II Decomp"
+#
+# GAMEDIR is a fixed path, not "$(dirname "$0")": on CrossMix OS / stock
+# TrimUI, a Roms/PORTS/*.sh is only a thin launcher stub -- confirmed by
+# reading this device's own real, working DevilutionX.sh, whose GAMEDIR is
+# "/$directory/ports/devilution" (control.txt's $directory is
+# "mnt/SDCARD/Data"), not anywhere near its own script's folder. Mirrors
+# that convention exactly instead of assuming a generic PortMaster layout.
+GAMEDIR="/mnt/SDCARD/Data/ports/diablo2decomp"
 
 controlfolder=""
 if [ -d "/opt/system/Tools/PortMaster/" ]; then
@@ -337,6 +343,8 @@ elif [ -d "/opt/tools/PortMaster/" ]; then
     controlfolder="/opt/tools/PortMaster"
 elif [ -d "/roms/ports/PortMaster/" ]; then
     controlfolder="/roms/ports/PortMaster"
+elif [ -d "/mnt/SDCARD/Apps/PortMaster/PortMaster/" ]; then
+    controlfolder="/mnt/SDCARD/Apps/PortMaster/PortMaster"
 fi
 
 if [ -n "$controlfolder" ] && [ -f "$controlfolder/control.txt" ]; then
@@ -362,11 +370,30 @@ fi
 
 command -v pm_end_splash >/dev/null 2>&1 && pm_end_splash
 
+# No physical keyboard, and Handkit has no on-screen keyboard yet for
+# SDL_StartTextInput (confirmed on real hardware: naming a new character
+# hangs with no way to type). d2d's own --start-name/--start-class/
+# --start-screen exist for exactly this (Steam Deck/console builds use the
+# same flags), so auto-create ONE character on first run, before any save
+# exists; later runs see that save and go to the normal, gamepad-only
+# character select screen (D-pad + A), never touching text input again.
+FIRST_RUN_ARGS=""
+if [ ! -d "$GAMEDIR/.config/d2d/save" ] || [ -z "$(ls -A "$GAMEDIR/.config/d2d/save" 2>/dev/null)" ]; then
+    FIRST_RUN_ARGS="--start-screen charcreate --start-class 0 --start-name Kain"
+fi
+
 # --widescreen: the Smart Pro/Brick panel is 16:9 (1280x720); d2d's world
 # view otherwise stays a fixed 800x600 (docs/design/rendering.md
 # "Widescreen (done, opt-in)"), i.e. pillarboxed on a wide screen. A real,
-# documented, opt-in d2d flag, not a TrimUI-specific hack.
-./d2d --data "$GAMEDIR/data" --widescreen "$@"
+# documented, opt-in d2d flag, not a TrimUI-specific hack. Only the in-game
+# view actually widens (main.cpp: "screen == Screen::InGame") -- menus and
+# character creation stay pillarboxed on purpose, confirmed by reading the
+# code, not a bug to chase.
+#
+# Logged to launcher.log beside d2d's own d2d.log: this frontend shows
+# nothing on screen if the game exits early, so without this a crash here
+# is invisible, exactly as happened on the first real-hardware attempt.
+./d2d --data "$GAMEDIR/data" --widescreen $FIRST_RUN_ARGS "$@" > "$GAMEDIR/launcher.log" 2>&1
 
 command -v pm_finish >/dev/null 2>&1 && pm_finish
 EOF
@@ -377,27 +404,34 @@ Diablo II Decomp (d2d) for TrimUI Smart Pro / Brick — unverified build
 =======================================================================
 Two ways to install, pick one:
 
-A) Through PortMaster (recommended, matches how other ports install):
+A) Through PortMaster (matches how other ports install):
    Copy "Diablo II Decomp.zip" into PortMaster/autoinstall/ on the SD card
    (e.g. /mnt/SDCARD/Apps/PortMaster/PortMaster/autoinstall/ on CrossMix
    OS) and open the PortMaster app: it auto-installs on launch, same as
    dropping any other port's zip there.
 
-B) Manual copy (no PortMaster involved):
-   Copy "Diablo II Decomp.sh" and the "Diablo II Decomp/" folder straight
-   into /mnt/SDCARD/Roms/PORTS/ on the SD card. CrossMix OS, NextUI, muOS
-   and knulli all scan Roms/PORTS/*.sh directly.
+B) Manual copy (no PortMaster involved; confirmed on CrossMix OS by
+   reading a real, working DevilutionX install on the same device --
+   the .sh in Roms/PORTS is only a launcher stub, the actual game folder
+   lives elsewhere, in Data/ports/):
+   1. Copy "Diablo II Decomp.sh" into /mnt/SDCARD/Roms/PORTS/
+   2. Copy the CONTENTS of the "Diablo II Decomp/" folder (not the folder
+      itself) into /mnt/SDCARD/Data/ports/diablo2decomp/ -- so that
+      folder directly contains d2d, data/, diablo2decomp.port.json, etc.
 
 Either way, then:
 1. Copy YOUR OWN, legally owned Diablo II + Lord of Destruction MPQ files
-   into "Diablo II Decomp/data/" (see data/README-put-your-mpq-files-here.txt
-   for the exact list), from a 1.14d install. Names must be lowercase
-   (Linux is case-sensitive; the original installer's D2xVideo.mpq/
-   D2xMusic.mpq need renaming). No game files are bundled or distributed
-   with d2d itself (LEGAL.md).
+   into that install's "data/" folder (see
+   data/README-put-your-mpq-files-here.txt for the exact list), from a
+   1.14d install. Names must be lowercase (Linux is case-sensitive; the
+   original installer's D2xVideo.mpq/D2xMusic.mpq need renaming). No game
+   files are bundled or distributed with d2d itself (LEGAL.md).
 2. Launch "Diablo II Decomp" from the Ports menu (or PortMaster's own
    games list, if installed via option A).
 3. d2d.cfg, d2d.log and save/ are written beside d2d (HOME is set there).
+   launcher.log (beside d2d, in the same Data/ports/ folder) captures
+   stdout/stderr too -- this frontend shows nothing on screen if the game
+   exits early, so that file is the only way to see what happened.
 
 This is a first attempt, not a tested release: see docs/trimui.md for
 what is and isn't confirmed on real hardware, and report back (screen,
