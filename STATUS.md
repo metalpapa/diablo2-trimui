@@ -341,6 +341,12 @@ at the very end of the process's life).
 - **Default bindings**: right trigger moved from Primary to Skill Picker.
 - **Crash handler** (`main.cpp`): dumps the faulting PC and backtrace to
   stderr (`launcher.log`). Debug aid, TrimUI bring-up.
+- **Entering/leaving dungeons with the pad**: level exits (cave mouths, stairs)
+  are now pickable by A like NPCs/objects (`pad_pick`, ids <= -4000); A walks
+  through them with the same click the mouse sends. Before, only the mouse
+  could take a warp.
+- **R1 shows/hides ground item names with the automap** (`d2d.cfg`
+  `automap_items = 1`, `Town::items_sticky`).
 - **Box art**: `overlay/assets/*-boxart.png` (640x480) go to
   `/Imgs/PORTS/<script name>.png` on the SD.
 
