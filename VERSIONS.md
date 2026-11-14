@@ -8,15 +8,15 @@ are mirrored under `vendor/sources/`, and the two moving-target projects
 
 | Dependency | Version | Pinned as | Verified |
 |---|---|---|---|
-| D2Decomp (game engine) | commit `beb487b` (2026-11-14) | git submodule `upstream/` | cross-compiles for aarch64 |
+| D2Decomp (game engine) | commit `beb487b` (2026-11-14) | git submodule `upstream/` | **builds a full aarch64 `d2d` binary** |
 | Handkit (toolchain + SDL3 backend) | commit `05e661f` | git submodule `vendor/handkit/` | toolchain+SDL3 built OK |
 | Zig (cross C/C++ compiler) | 0.14.1 | `vendor/sources/zig-*-0.14.1.tar.xz` | used successfully |
 | SDL3 (Handkit's `handkit-sdl` recipe) | 3.2.10 | `vendor/sources/SDL3-3.2.10.tar.gz` | built OK (not run on device) |
 | OpenAL Soft | **1.24.3**, not 1.25.x | `vendor/sources/openal-soft-1.24.3.tar.gz` | built OK |
 | zlib | 1.3.1 | `vendor/sources/zlib-1.3.1.tar.gz` | built OK |
 | bzip2 | 1.0.8 | `vendor/sources/bzip2-1.0.8.tar.gz` | built OK (custom CMakeLists, see trimui.sh) |
-| FFmpeg (Bink-only, built by D2Decomp's own CMake) | 9.0.2 | `vendor/sources/ffmpeg-9.0.2.tar.xz` | **fails to cross-compile, see STATUS.md** |
-| CLI11 (header-only, FetchContent in D2Decomp's CMake) | 2.6.2 | `vendor/sources/cli11-2.6.2.tar.gz` | not reached yet |
+| FFmpeg (Bink-only, built by D2Decomp's own CMake) | 9.0.2 | `vendor/sources/ffmpeg-9.0.2.tar.xz` | built OK (`overlay/patches/`, see STATUS.md) |
+| CLI11 (header-only, FetchContent in D2Decomp's CMake) | 2.6.2 | `vendor/sources/cli11-2.6.2.tar.gz` | built OK |
 | StormLib | bundled by D2Decomp (`-DD2D_BUNDLED_STORMLIB=ON`) | inside `upstream/` submodule | built OK |
 
 **Why OpenAL Soft 1.24.3, not 1.25.2** (the version D2Decomp's own

@@ -1,0 +1,29 @@
+diff --git a/apps/d2d/CMakeLists.txt b/apps/d2d/CMakeLists.txt
+index 30ce32e0..0766c4c8 100644
+--- a/apps/d2d/CMakeLists.txt
++++ b/apps/d2d/CMakeLists.txt
+@@ -146,6 +146,24 @@ if(D2D_BUNDLED_FFMPEG)
+                 "--extra-libs=${NX_STANDARD_LIBRARIES}")
+         else()
+             string(TOLOWER "${CMAKE_SYSTEM_NAME}" ffmpeg_os)
++            if(ffmpeg_os STREQUAL "linux")
++                # Same root cause as NINTENDO_SWITCH above (see its comment),
++                # same fix, because "sysctl" isn't an actual configure flag
++                # (FFmpeg's HAVE_LIST items aren't in CMDLINE_SELECT, so
++                # --disable-sysctl is "Unknown option"): check_func's link-
++                # only test for sysctl() finds a symbol in some aarch64-linux-
++                # gnu toolchains' glibc stub (e.g. Zig's, targeting glibc 2.33
++                # for the TrimUI) even though sys/sysctl.h doesn't exist
++                # there, so HAVE_SYSCTL=1 makes cpu.c's unconditional
++                # #include <sys/sysctl.h> fail. An empty header satisfies that
++                # include; av_cpu_count()'s sysctl() branches never compile in
++                # anyway since they need HW_NCPU/HW_NCPUONLINE (only ever
++                # defined by a real sys/sysctl.h), and Linux always takes the
++                # HAVE_SCHED_GETAFFINITY branch above them in cpu.c regardless.
++                file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/linux-no-sysctl-include/sys/sysctl.h" "")
++                list(APPEND ffmpeg_options
++                    "--extra-cflags=-I${CMAKE_CURRENT_BINARY_DIR}/linux-no-sysctl-include")
++            endif()
+         endif()
+         list(APPEND ffmpeg_options --enable-cross-compile --target-os=${ffmpeg_os}
+             --arch=${CMAKE_SYSTEM_PROCESSOR} --cc=${CMAKE_C_COMPILER} --ar=${CMAKE_AR}

@@ -4,166 +4,182 @@ Written mid-session because the agent session can die at any point and this
 is the single source of truth for "what's done" vs "what's left". Read this
 before re-reading chat history.
 
-**This machine (the one this was built on) already has everything installed**
-to resume immediately: Homebrew, `cmake`, `ninja`, `conan` 2.34, `llvm`
-(for a spare `clang-scan-deps`, no longer actually needed — see below), a
-cloned+configured Handkit at `~/Documents/handkit`, and a cloned
-`diablo2-trimui` working copy at `~/Documents/diablo2-trimui` whose `origin`
-is already `https://github.com/metalpapa/diablo2-trimui.git` (moved here
-from `/tmp/d2port/...` on 2026-11-14 so it's visible in Finder/Documents
-instead of living only in a temp dir that can get swept). If this exact
-machine/session is gone, "Resuming on a fresh machine" below has the from-
-scratch steps.
+**This machine already has everything installed** to resume immediately:
+Homebrew, `cmake`, `ninja`, `conan` 2.34, a cloned+configured Handkit at
+`~/Documents/handkit`, and this repo at `~/Documents/diablo2-trimui` (`origin`
+= `https://github.com/metalpapa/diablo2-trimui.git`). "Resuming on a fresh
+machine" below has from-scratch steps if this machine/session is gone.
 
-## What's actually proven so far (real, on this Mac, cross-compiling for aarch64)
+## Milestone: `tools/trimui.sh all` succeeds end to end
 
-1. Handkit's toolchain (`handkit-toolchain/0.14.1`, Zig 0.14.1 wrapping
-   Clang 19, target `aarch64-linux-gnu.2.33`) builds and installs via Conan.
-2. Handkit's SDL3 (`handkit-sdl/3.2.10`) cross-compiles for the TrimUI's
-   display backend. Not run on a device yet, but it compiles and links.
-3. OpenAL Soft **1.24.3** (not 1.25.2 — see VERSIONS.md) cross-compiles
-   against that SDL3, linked as `ALSOFT_BACKEND_SDL3`.
-4. zlib 1.3.1 and bzip2 1.0.8 cross-compile (bzip2 needed a hand-written
-   `CMakeLists.txt` since upstream only ships a Makefile; it's generated
-   inline by `trimui.sh`, not a separate vendored file).
-5. StormLib (D2Decomp's own bundled copy, `D2D_BUNDLED_STORMLIB=ON`)
-   cross-compiles against that zlib/bzip2.
-6. **Nearly all of D2Decomp's own C++23 game code compiles** for aarch64
-   (components/game, components/net, components/d2s, etc. — the bulk of the
-   engine). This is the strongest evidence yet that this port is feasible,
-   not just "reasoned."
+As of 2026-11-14, a full `./tools/trimui.sh build && ./tools/trimui.sh package`
+run completes with **no errors**, producing a real aarch64 Linux ELF binary:
 
-## The three build bugs found and fixed (all already applied in `overlay/tools/trimui.sh`)
+```
+upstream/build/trimui/d2d/apps/d2d/d2d
+  ELF 64-bit LSB executable, ARM aarch64, ... for GNU/Linux 2.0.0
+upstream/build/trimui-pak/
+  Diablo II Decomp/d2d          (301.7 MB, unstripped/debug build)
+  Diablo II Decomp.sh           (PortMaster launcher)
+  README-trimui.txt             (first-run setup instructions)
+```
+
+This is everything described as "proven so far" in earlier revisions of this
+file, **plus** the FFmpeg cross-compile bug below is now fixed, **plus**
+`tools/trimui.sh package` (previously untested) works.
+
+**Still true: nobody has run this on real TrimUI hardware.** The build
+compiling and linking cleanly is strong evidence, not proof — see "What
+hasn't been attempted at all" below for what real verification still needs.
+
+## The four build bugs found and fixed (all applied in `overlay/`)
 
 1. **Conan context bug**: `handkit-toolchain` must be `[tool_requires]`, not
-   `[requires]`, in the generated `conanfile.txt` — otherwise Conan tries to
-   build a Linux/arm64 Zig (meant to run ON an aarch64 Linux machine) instead
-   of the macOS-hosted one that actually cross-compiles. Fixed.
-2. **CMake C++20 module scanning**: OpenAL Soft 1.25.x uses real C++20
-   named modules; Zig's wrapped Clang has no matching `clang-scan-deps`.
-   Rather than fight that (tried: a host LLVM's `clang-scan-deps`, hit a
-   separate SDK/header mismatch that aborts — see "Dead end" below), the fix
-   was to **pin OpenAL Soft to 1.24.3**, which has no modules. Fixed, and
-   simpler than the alternative.
-3. **C++ standard downgrade**: Conan's generated `conan_toolchain.cmake`
-   sets `CMAKE_CXX_STANDARD` to **17** as a plain (non-cache) variable, from
-   the Handkit profile's `compiler.cppstd=17` (what SDL3/OpenAL need). That
-   shadows both `-DCMAKE_CXX_STANDARD=23` on the command line and
-   D2Decomp's own `if(NOT DEFINED CMAKE_CXX_STANDARD)` guard in its root
-   `CMakeLists.txt` — so d2d's own code was silently compiling as C++17 and
-   failing on `<span>`, `unordered_set::contains`, etc. Fixed with a tiny
-   generated wrapper toolchain file (`build/trimui/d2d-toolchain.cmake`):
-   `include()`s Conan's toolchain, then sets `CMAKE_CXX_STANDARD 23`
-   afterward in the same scope. This is the fix that got components/game
-   etc. compiling.
-4. **`-Werror` on an unrelated warning**: Conan's toolchain passes an
-   explicit `-stdlib=libc++` that Zig's cross driver already defaults to,
-   which Clang reports as "argument unused" — harmless, but D2Decomp
-   compiles its own code with `-Werror`. Fixed with `-DD2D_WERROR=OFF`,
-   which is D2Decomp's own documented escape hatch for exactly this
-   situation (see its `CMakeLists.txt`/`CONTRIBUTING.md`).
+   `[requires]` (`overlay/tools/trimui.sh`'s generated `conanfile.txt`).
+2. **CMake C++20 module scanning**: fixed by pinning OpenAL Soft to 1.24.3
+   instead of 1.25.x (see VERSIONS.md for why).
+3. **C++ standard downgrade**: Conan's toolchain sets `CMAKE_CXX_STANDARD 17`
+   as a plain variable, shadowing D2Decomp's own C++23 requirement. Fixed
+   with a tiny generated wrapper toolchain file in `overlay/tools/trimui.sh`
+   (`include()`s Conan's toolchain, then raises the standard back to 23).
+4. **FFmpeg's `sys/sysctl.h` false positive** (the one this session fixed —
+   see next section).
 
-### Dead end, for the record (don't redo this)
+Also: `-DD2D_WERROR=OFF` sidesteps an unrelated harmless warning (Conan's
+toolchain passes an explicit `-stdlib=libc++` Zig's driver already defaults
+to; D2D's own code is `-Werror` otherwise). Sanctioned escape hatch per
+D2Decomp's own CONTRIBUTING.md.
 
-Tried making OpenAL Soft 1.25.2 work by pointing
-`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` at a Homebrew-installed LLVM 23's
-`clang-scan-deps` (`brew install llvm`). It found the right compiler flags
-after fixing a quoting bug (an unquoted `${var:+...}` expansion was passing
-literal quote characters into CMake's cache — if this pattern is needed again
-elsewhere, build it as a bash array instead), but then the host LLVM 23
-scanner's own default search paths pulled in Apple's SDK headers
-(`.../MacOSX27.sdk/usr/include/c++/v1/...`) while scanning code meant for
-the Linux target, and one chain of standard headers hit `'stdarg.h' file not
-found`. Likely fixable with more `-nostdinc`-style isolation, but switching
-OpenAL versions was far less effort for the same result.
+### Bug #4 in detail: FFmpeg's `sys/sysctl.h`, fixed via `overlay/patches/`
 
-## What's still failing right now
+`libavutil/cpu.c` does `#if HAVE_SYSCTL / #include <sys/sysctl.h>`. FFmpeg's
+`configure` sets `HAVE_SYSCTL=1` from a **link-only** test (`check_func
+sysctl`, no header check) that false-positives against some aarch64-linux-gnu
+toolchains' glibc stub — including Zig's (targeting glibc 2.33, what the
+TrimUI firmware has) — even though `sys/sysctl.h` doesn't exist for that
+target. D2Decomp's own `apps/d2d/CMakeLists.txt` already solves this exact
+false positive for `NINTENDO_SWITCH` (libnx has the same symbol-without-
+header situation) by writing an **empty** `sys/sysctl.h` into a generated
+include dir and passing it via `--extra-cflags=-I...`. The fix applied here
+mirrors that, in the generic `CMAKE_SYSTEM_NAME=Linux` branch (the one any
+aarch64-linux-gnu cross target, not just TrimUI, takes):
 
-**FFmpeg 9.0.2's own cross-compile** (built by D2Decomp's own
-`apps/d2d/CMakeLists.txt` `ExternalProject`, not by `trimui.sh` directly):
-
-```
-./src/libavutil/cpu.c:46:10: fatal error: 'sys/sysctl.h' file not found
+```cmake
+if(ffmpeg_os STREQUAL "linux")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/linux-no-sysctl-include/sys/sysctl.h" "")
+    list(APPEND ffmpeg_options
+        "--extra-cflags=-I${CMAKE_CURRENT_BINARY_DIR}/linux-no-sysctl-include")
+endif()
 ```
 
-`sys/sysctl.h` is a macOS/BSD header, not a Linux one. This means FFmpeg's
-own `./configure` (an autoconf-style script, not CMake) detected
-`HAVE_SYSCTL=1` even though the target is Linux — almost certainly because
-one of its feature-detection test compiles ran against the **build host's**
-default include paths rather than strictly the Zig/Linux target's, despite
-`--target-os=linux --arch=aarch64 --cc=<handkit-cc>` being passed (see
-`apps/d2d/CMakeLists.txt`'s `CMAKE_CROSSCOMPILING` branch, which already
-handles a generic `Linux` system name — this is the path being taken).
+It's safe: `av_cpu_count()`'s `sysctl()` branches in `cpu.c` are gated on
+`HW_NCPU`/`HW_NCPUONLINE`, macros only a *real* `sys/sysctl.h` would define,
+so the empty header never makes that code path compile in — and Linux always
+takes the `HAVE_SCHED_GETAFFINITY` branch above it in `cpu.c` anyway.
 
-**Not yet investigated**: whether this needs an explicit
-`--extra-cflags=--sysroot=...` / `-nostdinc` pushed through
-`D2D_FFMPEG_...` cache variables, whether it's a `zig cc` driver quirk when
-invoked the way FFmpeg's `configure` calls `$cc -c -o ...` directly (without
-CMake mediating), or whether disabling the specific sysctl-gated code path
-via an extra `--disable-*` flag sidesteps it entirely (check what in
-`libavutil/cpu.c` guards that include — on a quick read it's almost
-certainly `HAVE_SYSCTL_BY_NAME` turned on by a feature-test that shouldn't
-pass when cross-compiling).
+**Dead end tried first, for the record**: `--disable-sysctl` /
+`--disable-sysctlbyname` on FFmpeg's configure command line. These look like
+valid flags (`sysctl` is in FFmpeg's internal `HAVE_LIST`) but FFmpeg's
+`configure` only accepts `--enable-X`/`--disable-X` for names in
+`$COMPONENT_LIST` or `$CMDLINE_SELECT` — plain `HAVE_LIST` items aren't
+configurable from the command line at all, so this fails with `Unknown
+option "--disable-sysctl"`. Don't redo this.
 
-Next concrete step: read the relevant section of
-`upstream/apps/d2d/CMakeLists.txt` (the `ffmpeg_options` list and the
-`CMAKE_CROSSCOMPILING` branch, roughly lines 90-150) and FFmpeg 9.0.2's own
-`configure` script's sysctl detection, then either add a `--disable-*` flag
-or force `HAVE_SYSCTL=no` into the FFmpeg config without hand-patching
-FFmpeg's source (patching vendored source would break the checksum story in
-VERSIONS.md, so prefer a configure flag).
+**Why this is a patch, not a `trimui.sh` flag**: there's no existing
+`D2D_FFMPEG_EXTRA_OPTIONS`-style CMake hook to inject this from outside, and
+patching FFmpeg's own *source* (vs. D2Decomp's small, well-commented
+`CMakeLists.txt`) would break the checksum story in VERSIONS.md. The patch
+lives in `overlay/patches/d2d-ffmpeg-no-sysctl.patch`, applied automatically
+and idempotently by `scripts/apply-overlay.sh` (safe to re-run; it checks
+`git apply --reverse --check` first and skips if already applied). This is
+exactly the kind of one-line, additive, well-justified change D2Decomp's own
+`NINTENDO_SWITCH` branch already demonstrates they're open to upstreaming —
+worth offering as a PR once hardware testing confirms the rest works.
+
+### Also fixed this session: a stale-absolute-path build cache
+
+Unrelated bug, not a code fix: `build/trimui/d2d/` (gitignored, pure cache)
+still had `/private/tmp/d2port/...` absolute paths baked into its
+`CMakeCache.txt`/subbuild dirs from before this repo moved to
+`~/Documents/diablo2-trimui` on 2026-11-14 (see VERSIONS.md commit history).
+`cmake --fresh` only resets the *top-level* cache, not FetchContent's nested
+subbuild dirs (e.g. `_deps/stormlib-subbuild`), so it errored with "current
+CMakeCache.txt directory is different than...". Fixed by moving (not
+deleting — build caches are safe to lose, but this was also just quicker)
+`build/trimui/d2d` out of the way and letting the next build regenerate it
+from scratch. If this resurfaces: delete/move `build/trimui/d2d` (NOT the
+whole `build/trimui/`, which still has the slower-to-rebuild OpenAL/zlib/
+bzip2 pieces cached) before rebuilding.
 
 ## What hasn't been attempted at all yet
 
-- Actually running `tools/trimui.sh package` (untested, but should work
-  once `build` finishes — it only copies the binary and writes a shell
-  script).
-- Anything on real TrimUI hardware: display, audio, controls, performance,
-  save/load. Nobody has run this on a device.
-- A fresh-machine/fresh-clone dry run of the whole pipeline end to end
-  (everything so far was iterated in place on one machine's build directory).
+- **Anything on real TrimUI hardware**: display, audio, controls,
+  performance, save/load. Nobody has run this on a device. This is the one
+  remaining unknown that actually matters — everything else in this file is
+  "it compiles," not "it works."
+- Copying the packaged build + a legally owned, 1.14d-patched Diablo II + LoD
+  data folder onto a TrimUI's SD card and launching it via PortMaster/Ports.
+- A fresh-machine/fresh-clone dry run of the whole pipeline end to end.
+- Submitting the FFmpeg/sysctl fix upstream to `psi29a/d2decomped` as a PR.
+
+## Reference material found this session (not yet used, just noted)
+
+`~/Documents/devilutionx-reference` — a shallow clone of
+[diasurgical/devilutionx](https://github.com/diasurgical/devilutionx) (the
+open-source Diablo I port), at the user's suggestion, as a reference for
+generic-Linux/handheld SDL packaging patterns if/when needed (e.g. input
+mapping, controller config). Not inspected in depth yet; no TrimUI-specific
+code found in a first pass (`grep -i trimui` came up empty) — it's a
+cross-platform engine port, not a TrimUI-specific one, so anything useful
+from it would be by analogy, not copy-paste.
+
+## Available game files (not yet used)
+
+`~/Downloads/Diablo II Complete (2000-01) [es-ES digital release] V1.12-1.14d/`
+has the official installer `.mpq` files (D2 1.12 + D2:LoD, es-ES, ~2.1 GB) —
+this is the source to extract the actual `d2data.mpq`, `d2exp.mpq`, etc. that
+`d2d --data <dir>` needs (README-trimui.txt in the packaged build explains
+the full list). **Not yet extracted or copied anywhere** — needs the
+installer run (or 7z/innoextract on the `.mpq`-named installer blobs, which
+despite the extension are Blizzard's old InstallShield packages, not game
+MPQs themselves) to get the real data files, then those get patched to
+1.14d and copied into `Diablo II Decomp/data/` on the SD card. This is a
+step for when actually testing on hardware, not before.
 
 ## Resume commands (same machine)
 
 ```sh
 cd ~/Documents/diablo2-trimui
-./scripts/apply-overlay.sh         # re-copy the latest overlay/tools/trimui.sh into upstream/
+./scripts/apply-overlay.sh         # re-copy tools/trimui.sh + apply overlay/patches/
 cd upstream
 export HANDKIT_SDK=~/Documents/handkit
-./tools/trimui.sh build 2>&1 | tee ~/Documents/trimui-build-resume.log
+./tools/trimui.sh all 2>&1 | tee ~/Documents/trimui-build-resume.log
 ```
 
-The build is incremental (Ninja + cached Conan packages): OpenAL, zlib,
-bzip2 and the toolchain/SDL3 steps are skipped if their install markers
-already exist under `build/trimui/`, so a rerun goes straight to d2d's own
-compile and should hit the FFmpeg failure above within a minute or two.
+Incremental (Ninja + cached Conan packages): a clean rerun should finish in
+well under a minute once OpenAL/zlib/bzip2/FFmpeg's install markers exist.
 
 ## Resuming on a fresh machine (if this one/its /tmp is gone)
-
-The repo is self-sufficient for this — that's the point of `vendor/`:
 
 ```sh
 git clone --recurse-submodules https://github.com/metalpapa/diablo2-trimui.git
 cd diablo2-trimui
-brew install cmake ninja conan llvm   # llvm only needed if revisiting the OpenAL 1.25.x path
+brew install cmake ninja conan
 conan profile detect --force
 ./scripts/apply-overlay.sh
 export HANDKIT_SDK=$PWD/vendor/handkit
-conan install vendor/handkit/... # see vendor/handkit.conan.lock and its own ./tools/handkit configure
-cd upstream && ./tools/trimui.sh build
+# see vendor/handkit.conan.lock and its own ./tools/handkit configure
+cd upstream && ./tools/trimui.sh all
 ```
 
-(The Handkit Conan packages themselves aren't vendored as binaries — only
-their *sources* are, in `vendor/sources/` — so the first build on a fresh
-machine still compiles Zig/SDL3 from those vendored sources rather than
-downloading them again, but does redo the actual compilation. That's as
-frozen as this gets without vendoring compiled binaries for a specific host
-OS/arch, which would stop working the moment the host changes.)
+(Handkit's Conan packages aren't vendored as binaries — only their
+*sources* are, in `vendor/sources/` — so a fresh machine's first build still
+compiles Zig/SDL3 from those vendored sources, not downloads them again.)
 
 ## Everything described here is already committed/pushed
 
-As of this file's commit, `overlay/tools/trimui.sh` has all four fixes
-above applied, `VERSIONS.md` reflects the OpenAL 1.24.3 switch and the new
-zlib/bzip2 pins, and `vendor/sources/` has all the tarballs this needs
-(including stale-but-harmless `openal-soft-1.25.2.tar.gz` removed). Nothing
-described in this file as "done" exists only on a single machine's disk.
+`overlay/tools/trimui.sh` has all build-script fixes; `overlay/patches/`
+has the FFmpeg CMakeLists.txt patch; `scripts/apply-overlay.sh` applies
+both idempotently; `VERSIONS.md` reflects every dependency's actual,
+now-successful build status. Nothing described here as "done" exists only
+on one machine's disk.
