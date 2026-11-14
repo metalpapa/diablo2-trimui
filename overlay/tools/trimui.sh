@@ -362,7 +362,11 @@ fi
 
 command -v pm_end_splash >/dev/null 2>&1 && pm_end_splash
 
-./d2d --data "$GAMEDIR/data" "$@"
+# --widescreen: the Smart Pro/Brick panel is 16:9 (1280x720); d2d's world
+# view otherwise stays a fixed 800x600 (docs/design/rendering.md
+# "Widescreen (done, opt-in)"), i.e. pillarboxed on a wide screen. A real,
+# documented, opt-in d2d flag, not a TrimUI-specific hack.
+./d2d --data "$GAMEDIR/data" --widescreen "$@"
 
 command -v pm_finish >/dev/null 2>&1 && pm_finish
 EOF

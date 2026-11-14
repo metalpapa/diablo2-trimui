@@ -112,6 +112,25 @@ Key findings:
   monogram, no Blizzard art per LEGAL.md) and a `gameinfo.xml`, give the
   Ports menu a real title/icon instead of a bare filename.
 
+## Verified without hardware, as far as that goes (2026-11-14)
+
+The engine itself and real, legally obtained game data were checked by
+building plain upstream d2d natively for this Mac (nothing TrimUI-specific,
+just the same engine code) and running `tools/d2d_smoke.py` against it: it
+loaded the MPQs, built the world, and rendered a real title screen and
+in-game scene, exit code 0. This doesn't touch anything TrimUI/Handkit-
+specific (display backend, controls, performance), but it does confirm the
+game data this port's `data/` folder expects is genuinely valid and that
+D2Decomp plays it correctly -- see STATUS.md's Milestone 4 for the full
+write-up, including one minor, non-blocking table-version warning found
+this way (`CubeMain.txt`, a Horadric Cube recipe count, 150 rows vs 1.14d's
+151 -- `check_patch_layer()` warns and continues, doesn't refuse).
+
+The same read of `docs/design/rendering.md` while here found `--widescreen`:
+now passed by the launcher by default, since without it d2d's view is a
+fixed 800x600 (4:3), pillarboxed on the Smart Pro/Brick's 16:9 1280x720
+panel.
+
 ## Not there yet (first things to find out on real hardware)
 
 - It hasn't run on a TrimUI. Expect at least one round of fixes: shared-
