@@ -233,45 +233,163 @@ EOF
     cmake --build "$build/d2d" --target d2d
 }
 
+# PortMaster's real on-disk format (reverse-engineered from a real CrossMix
+# OS install's bundled harbourmaster -- Apps/PortMaster/PortMaster/pylibs/
+# harbourmaster/{captain,info,platform,hardware}.py -- not just the public
+# docs; see docs/trimui.md "PortMaster packaging" for the citations):
+#   - A port zip is one or more top-level directories plus one or more
+#     top-level *.sh launchers (captain.py's check_port: no .sh allowed
+#     *inside* the directory, at least one directory, at least one script).
+#   - A "<name>.port.json" (or literally "port.json") sitting at the top of
+#     the directory is the manifest (info.py's PORT_INFO_*_ATTRS is the
+#     full v3 schema). 'name' and 'items' are always overwritten by
+#     harbourmaster itself from the zip's own contents, so this doesn't
+#     need to enumerate files.
+#   - min_glibc is checked against the device's actual glibc
+#     (hardware.py: "trimui-*": "2.33" -- confirms Handkit's 2.33 pin here
+#     is exactly what PortMaster itself expects on this device).
+#   - Dropping the zip in PortMaster/autoinstall/ makes PortMaster install
+#     it the next time it's opened (PortMaster.sh's "Autoinstallation
+#     Code"), the "I didn't have to do anything else" experience other
+#     ports (e.g. DevilutionX) already give on this device.
 trimui_package() {
     [[ -f $build/d2d/apps/d2d/d2d ]] || { echo "trimui.sh: build first (tools/trimui.sh build)" >&2; exit 1; }
-    # A PortMaster-shaped port folder: CrossMix OS, NextUI, muOS and knulli
-    # all scan Roms/PORTS/*.sh (docs/trimui.md). No PortMaster packaging
-    # metadata (port.json, gptokeyb mapping) yet — this is a manual sideload,
-    # not a PortMaster store submission.
     pak="$out/Diablo II Decomp"
-    rm -rf "$pak" && mkdir -p "$pak"
+    rm -rf "$pak" && mkdir -p "$pak/data"
     cp "$build/d2d/apps/d2d/d2d" "$pak/"
+
+    cat > "$pak/data/README-put-your-mpq-files-here.txt" <<'EOF'
+Put your own, legally owned Diablo II + Lord of Destruction (1.14d) MPQ
+files here: d2data.mpq, d2char.mpq, d2exp.mpq, d2sfx.mpq, d2music.mpq,
+d2video.mpq, d2xvideo.mpq, d2xmusic.mpq, d2speech.mpq, d2xtalk.mpq,
+patch_d2.mpq. Lowercase filenames (Linux is case-sensitive; the original
+installer ships D2xVideo.mpq/D2xMusic.mpq with capitals). No game files
+are bundled with d2d itself (LEGAL.md). See
+https://github.com/metalpapa/diablo2-trimui
+EOF
+
+    cat > "$pak/diablo2decomp.port.json" <<'EOF'
+{
+    "version": 3,
+    "name": "diablo2decomp.port.json",
+    "items": null,
+    "items_opt": null,
+    "attr": {
+        "title": "Diablo II Decomp",
+        "desc": "D2Decomp's open-source reimplementation of Diablo II + Lord of Destruction (d2d), cross-compiled for the TrimUI Smart Pro/Brick via Handkit. Experimental: not yet verified on real hardware.",
+        "inst": "Copy your own, legally owned Diablo II + Lord of Destruction MPQ files (a 1.14d install) into this port's data/ folder -- see data/README-put-your-mpq-files-here.txt for the exact list. No game files are bundled (LEGAL.md).",
+        "genres": ["rpg", "action"],
+        "porter": ["metalpapa"],
+        "image": {},
+        "rtr": false,
+        "exp": true,
+        "runtime": null,
+        "min_glibc": "2.33",
+        "reqs": [],
+        "arch": []
+    }
+}
+EOF
+
+    # The launcher: PortMaster's own generic controlfolder-detection
+    # (verbatim from its PortMaster.sh), so this works whether launched by
+    # PortMaster itself, dropped straight into Roms/PORTS without it, or
+    # moved to a different PortMaster-supported device entirely. No
+    # gptokeyb/gptokeyb2: d2d reads SDL3 gamepad input natively
+    # (apps/d2d/gamepad_map.hpp) instead of expecting keyboard/mouse, so
+    # there's nothing for gptokeyb's button-to-key translation to do here.
     cat > "$out/Diablo II Decomp.sh" <<'EOF'
 #!/bin/sh
-# PortMaster launcher: see ../README-trimui.txt for first-run setup.
-DIR="$(dirname "$0")/Diablo II Decomp"
-cd "$DIR" || exit 1
-export HOME="$DIR"
-./d2d --data "$DIR/data" "$@"
+# PortMaster port script for Diablo II Decomp (d2d).
+# https://github.com/metalpapa/diablo2-trimui -- see README-trimui.txt for
+# first-run setup (you supply your own, legally owned game files).
+
+GAMEDIR="$(dirname "$0")/Diablo II Decomp"
+
+controlfolder=""
+if [ -d "/opt/system/Tools/PortMaster/" ]; then
+    controlfolder="/opt/system/Tools/PortMaster"
+elif [ -d "/opt/tools/PortMaster/" ]; then
+    controlfolder="/opt/tools/PortMaster"
+elif [ -d "/roms/ports/PortMaster/" ]; then
+    controlfolder="/roms/ports/PortMaster"
+fi
+
+if [ -n "$controlfolder" ] && [ -f "$controlfolder/control.txt" ]; then
+    # shellcheck disable=SC1091
+    . "$controlfolder/control.txt"
+    [ -f "$controlfolder/mod_${CFW_NAME}.txt" ] && . "$controlfolder/mod_${CFW_NAME}.txt"
+    get_controls
+    pm_platform_helper "$GAMEDIR/d2d"
+fi
+
+cd "$GAMEDIR" || exit 1
+export HOME="$GAMEDIR"
+
+if [ ! -d "data" ] || [ -z "$(ls -A data 2>/dev/null)" ]; then
+    if command -v pm_show_error >/dev/null 2>&1; then
+        pm_show_error "Diablo II Decomp" "Missing game data: see data/README-put-your-mpq-files-here.txt"
+    else
+        echo "Diablo II Decomp: missing game data in '$GAMEDIR/data'. See README-trimui.txt." >&2
+    fi
+    command -v pm_finish >/dev/null 2>&1 && pm_finish
+    exit 1
+fi
+
+command -v pm_end_splash >/dev/null 2>&1 && pm_end_splash
+
+./d2d --data "$GAMEDIR/data" "$@"
+
+command -v pm_finish >/dev/null 2>&1 && pm_finish
 EOF
     chmod +x "$out/Diablo II Decomp.sh" "$pak/d2d"
+
     cat > "$out/README-trimui.txt" <<'EOF'
 Diablo II Decomp (d2d) for TrimUI Smart Pro / Brick — unverified build
 =======================================================================
-1. Copy this whole folder to /mnt/SDCARD/Roms/PORTS/ on the SD card.
-2. Create "Diablo II Decomp/data/" next to d2d and copy YOUR OWN, legally
-   owned Diablo II + Lord of Destruction MPQ files into it (the same
-   files d2d's README calls --data: d2data.mpq, d2char.mpq, d2exp.mpq,
-   d2sfx.mpq, d2music.mpq, d2video.mpq, d2xvideo.mpq, d2xmusic.mpq,
-   d2speech.mpq, d2xtalk.mpq, patch_d2.mpq), from a 1.14d install. Names
-   must be lowercase (Linux is case-sensitive; the original installer's
-   D2xVideo.mpq/D2xMusic.mpq need renaming). No game files are
-   bundled or distributed with d2d itself (LEGAL.md).
-3. From CrossMix OS's PortMaster app (or the Ports menu), launch
-   "Diablo II Decomp".
-4. d2d.cfg, d2d.log and save/ are written beside d2d (HOME is set there).
+Two ways to install, pick one:
+
+A) Through PortMaster (recommended, matches how other ports install):
+   Copy "Diablo II Decomp.zip" into PortMaster/autoinstall/ on the SD card
+   (e.g. /mnt/SDCARD/Apps/PortMaster/PortMaster/autoinstall/ on CrossMix
+   OS) and open the PortMaster app: it auto-installs on launch, same as
+   dropping any other port's zip there.
+
+B) Manual copy (no PortMaster involved):
+   Copy "Diablo II Decomp.sh" and the "Diablo II Decomp/" folder straight
+   into /mnt/SDCARD/Roms/PORTS/ on the SD card. CrossMix OS, NextUI, muOS
+   and knulli all scan Roms/PORTS/*.sh directly.
+
+Either way, then:
+1. Copy YOUR OWN, legally owned Diablo II + Lord of Destruction MPQ files
+   into "Diablo II Decomp/data/" (see data/README-put-your-mpq-files-here.txt
+   for the exact list), from a 1.14d install. Names must be lowercase
+   (Linux is case-sensitive; the original installer's D2xVideo.mpq/
+   D2xMusic.mpq need renaming). No game files are bundled or distributed
+   with d2d itself (LEGAL.md).
+2. Launch "Diablo II Decomp" from the Ports menu (or PortMaster's own
+   games list, if installed via option A).
+3. d2d.cfg, d2d.log and save/ are written beside d2d (HOME is set there).
 
 This is a first attempt, not a tested release: see docs/trimui.md for
 what is and isn't confirmed on real hardware, and report back (screen,
 audio, controls, performance) so it can be fixed.
 EOF
+
+    # Defence in depth, on top of data/ never containing anything but the
+    # placeholder .txt at this point in the script: strip any *.mpq that
+    # somehow ended up there (e.g. a local test rig that already staged
+    # real game data into build/trimui-pak/ for its own hardware-testing
+    # use) before it could ever get zipped up. Never ship game data.
+    zip_path="$out/Diablo II Decomp.zip"
+    rm -f "$zip_path"
+    (cd "$out" && zip -rq -X "Diablo II Decomp.zip" \
+        "Diablo II Decomp.sh" "Diablo II Decomp" \
+        -x "Diablo II Decomp/data/*.mpq" -x "Diablo II Decomp/data/*.MPQ")
+
     echo "Packaged: $out"
+    echo "  - Manual copy: \"Diablo II Decomp.sh\" + \"Diablo II Decomp/\""
+    echo "  - PortMaster autoinstall: \"Diablo II Decomp.zip\""
 }
 
 case $cmd in

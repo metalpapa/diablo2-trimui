@@ -111,27 +111,117 @@ from scratch. If this resurfaces: delete/move `build/trimui/d2d` (NOT the
 whole `build/trimui/`, which still has the slower-to-rebuild OpenAL/zlib/
 bzip2 pieces cached) before rebuilding.
 
+## Milestone 2: real PortMaster packaging, verified against real PortMaster code (2026-11-14)
+
+The user asked how this compares to installing a normal PortMaster port
+(e.g. DevilutionX, where you drop a file and PortMaster auto-installs it
+into its own catalog) and pointed out they have a real CrossMix OS build
+locally (`~/Downloads/CrossMix-OS_v1.3.0.zip`/`CrossMix-OS_v1.3.0/`). That
+turned out to be the single best resource available: it bundles PortMaster's
+actual Python backend (`harbourmaster`), so instead of guessing the on-disk
+format from scattered public docs, **the real install-validation code could
+be run directly** against this repo's own package output.
+
+**What changed**: `tools/trimui.sh package` now also writes:
+
+- `Diablo II Decomp/diablo2decomp.port.json` -- the PortMaster v3 manifest
+  (`title`, `desc`, `inst`, `genres`, `porter`, `min_glibc: "2.33"`, `exp:
+  true`, `rtr: false`).
+- A rewritten `Diablo II Decomp.sh` using PortMaster's own generic
+  controlfolder-detection (copied verbatim from its `PortMaster.sh`), so it
+  works identically whether PortMaster installed it or it was hand-copied.
+  Gracefully degrades (plain `echo`/direct launch) if PortMaster isn't
+  present at all. No `gptokeyb`/`gptokeyb2` -- see below.
+- `Diablo II Decomp.zip` -- the real installable artifact: drop it in
+  `PortMaster/autoinstall/` and opening PortMaster installs it automatically,
+  same UX as any other port (including DevilutionX, what the user compared
+  it to). The unzipped folder + script are still written too, for a manual
+  `Roms/PORTS/` copy without PortMaster at all.
+
+**How this was verified without hardware** (as close to real validation as
+possible from a dev machine): the user's CrossMix build's
+`Apps/PortMaster/PortMaster/pylibs/harbourmaster/` was used directly --
+
+```python
+import sys; sys.path.insert(0, ".../CrossMix-OS_v1.3.0/Apps/PortMaster/PortMaster/pylibs")
+from harbourmaster.captain import check_port          # the real zip validator
+from harbourmaster.util import match_requirements, version_parse
+
+info = check_port("Diablo II Decomp.zip", "Diablo II Decomp.zip")   # parses clean
+# ... simulated TrimUI Smart Pro capabilities + glibc 2.33 ...
+# -> "would be shown to a TrimUI Smart Pro user: True"
+```
+
+(needed `pip install loguru requests colorama ansimarkup` on the host to
+import harbourmaster standalone -- these are PortMaster's own runtime deps,
+nothing added to this repo).
+
+**Key findings from reading the real source** (full citations and
+reasoning in `docs/trimui.md`'s new "PortMaster packaging" section and
+inline in `trimui_package()`):
+
+1. A port zip = 1+ top-level dirs + 1+ top-level `*.sh` scripts; the
+   `<name>.port.json` manifest sits inside the dir. `name`/`items` in it
+   are always recomputed by harbourmaster from the zip itself.
+2. `min_glibc` is checked against a real per-device table that has
+   `"trimui-*": "2.33"` -- **independent confirmation from PortMaster's own
+   code that Handkit's glibc 2.33 pin (VERSIONS.md) is exactly correct**,
+   not just an assumption this project made on its own.
+3. **No gptokeyb/gptokeyb2 needed.** That tool translates gamepad input
+   into synthetic keyboard/mouse events, for ports of PC games that only
+   understand a keyboard. Confirmed by reading `apps/d2d/gamepad_map.hpp`:
+   d2d already reads SDL3 gamepad input natively (same as its Vita/Switch
+   builds), so there's no translation layer to add. This also means no
+   `gamecontrollerdb.txt` entry or `.gptk` mapping file was needed -- SDL3
+   itself handles controller mapping.
+4. `PortMaster/autoinstall/` (literally a folder containing
+   `place-zips-here-for-autoinstallation.txt` in the real install) is where
+   you drop a zip for the next PortMaster launch to auto-install it --
+   confirmed straight from `PortMaster.sh`'s own "Autoinstallation Code"
+   section, not inferred.
+
+**Still not there**: no icon/art (would need placeholder, non-Blizzard
+art -- `LEGAL.md` rules out anything using real D2 assets) and no
+`gameinfo.xml` for a nicer Ports-menu listing. Low priority: `port.json`'s
+`title`/`desc` already cover PortMaster's own in-app listing without it.
+
+**Not done, and can't be done without hardware**: actually running the
+install. Everything above is "PortMaster's own code says this is a valid,
+installable, compatible port" -- which is much stronger evidence than
+before, but still not the same as a confirmed install + launch on a real
+TrimUI.
+
 ## What hasn't been attempted at all yet
 
 - **Anything on real TrimUI hardware**: display, audio, controls,
   performance, save/load. Nobody has run this on a device. This is the one
   remaining unknown that actually matters — everything else in this file is
   "it compiles," not "it works."
-- Copying the packaged build (already staged with real game data — see
-  below) onto a TrimUI's SD card and launching it via PortMaster/Ports.
+- Copying `Diablo II Decomp.zip` (or the manual folder, both already have
+  real game data staged -- see below) onto a TrimUI's SD card and installing
+  it via PortMaster's `autoinstall/` or a plain `Roms/PORTS/` copy.
 - A fresh-machine/fresh-clone dry run of the whole pipeline end to end.
 - Submitting the FFmpeg/sysctl fix upstream to `psi29a/d2decomped` as a PR.
+- Optional, low-priority polish: a placeholder (non-Blizzard) icon +
+  `gameinfo.xml` for a nicer Ports-menu listing; this doesn't block
+  installing or launching.
 
-## Reference material found this session (not yet used, just noted)
+## Reference material available locally (found this session)
 
-`~/Documents/devilutionx-reference` — a shallow clone of
-[diasurgical/devilutionx](https://github.com/diasurgical/devilutionx) (the
-open-source Diablo I port), at the user's suggestion, as a reference for
-generic-Linux/handheld SDL packaging patterns if/when needed (e.g. input
-mapping, controller config). Not inspected in depth yet; no TrimUI-specific
-code found in a first pass (`grep -i trimui` came up empty) — it's a
-cross-platform engine port, not a TrimUI-specific one, so anything useful
-from it would be by analogy, not copy-paste.
+- `~/Documents/devilutionx-reference` — a shallow clone of
+  [diasurgical/devilutionx](https://github.com/diasurgical/devilutionx) (the
+  open-source Diablo I port), at the user's suggestion. Not inspected in
+  depth; no TrimUI-specific code found in a first pass (`grep -i trimui`
+  came up empty) — useful by analogy (packaging conventions for other
+  CFWs, e.g. `Packaging/miyoo_mini/skeleton_OnionOS/`), not copy-paste.
+- `~/Downloads/CrossMix-OS_v1.3.0.zip` / `CrossMix-OS_v1.3.0/` — a real
+  CrossMix OS build the user has locally. **This is what actually made the
+  PortMaster packaging work verifiable** (see the Milestone 2 section
+  above) — its `Apps/PortMaster/PortMaster/pylibs/harbourmaster/` is
+  PortMaster's real install-time validation code, runnable standalone on a
+  dev machine with a few `pip install`s. Worth remembering for any future
+  CrossMix/TrimUI-specific question: check this local copy before
+  searching the web, it's authoritative and offline.
 
 ## Game files: verified genuine, extracted, and staged (2026-11-14)
 
@@ -173,9 +263,14 @@ names" as a still-open loader TODO, so this isn't handled automatically yet).
 **Staged for hardware testing**: all 10 required MPQs + `d2char.mpq`, correctly
 renamed to lowercase, are sitting in
 `upstream/build/trimui-pak/Diablo II Decomp/data/` (~2.0 GB, gitignored —
-never committed, per LEGAL.md). The whole `trimui-pak/` folder is now ready to
-copy to a TrimUI's SD card (`/mnt/SDCARD/Roms/PORTS/`) the moment there's
-actual hardware to test on.
+never committed, per LEGAL.md, and **excluded from `Diablo II Decomp.zip`** --
+`trimui_package()` strips `*.mpq`/`*.MPQ` when zipping, see Milestone 2).
+**Re-running `tools/trimui.sh package` wipes and recreates this folder**
+(`rm -rf "$pak"`), so if that's run again, re-copy the MPQs back in from
+`/tmp/d2-extract-test/` (if that machine/session still has it) or re-extract
+them fresh with the `mpyq` snippet above before copying anything to hardware.
+The whole `trimui-pak/` folder (manual copy *or* `Diablo II Decomp.zip`) is
+ready to go the moment there's actual hardware to test on.
 
 ## Resume commands (same machine)
 

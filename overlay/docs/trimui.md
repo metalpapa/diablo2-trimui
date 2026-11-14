@@ -52,17 +52,65 @@ tools/trimui.sh all      # build + package, into build/trimui-pak/
 
 ## Where its files go
 
-Copy `build/trimui-pak/`'s contents to `/mnt/SDCARD/Roms/PORTS/` on the SD
-card: the `Diablo II Decomp.sh` launcher and the `Diablo II Decomp/` folder
-beside it. CrossMix OS, NextUI, muOS and knulli all list `Roms/PORTS/*.sh` in
-their PortMaster-style ports menu. This is a manual sideload, not a
-PortMaster store submission — no `port.json` or controller-mapping metadata
-yet.
+`tools/trimui.sh package` writes `build/trimui-pak/` with two install paths,
+pick one:
+
+- **Through PortMaster** (recommended — matches how every other port
+  installs, including on this device): drop `Diablo II Decomp.zip` into
+  `PortMaster/autoinstall/` on the SD card and open the PortMaster app; it
+  auto-installs on launch (verified against this section's citations below).
+- **Manual copy** (no PortMaster involved): copy `Diablo II Decomp.sh` and
+  `Diablo II Decomp/` straight into `/mnt/SDCARD/Roms/PORTS/`. CrossMix OS,
+  NextUI, muOS and knulli all scan `Roms/PORTS/*.sh` directly.
 
 Put your own, legally owned Diablo II + Lord of Destruction MPQs (a 1.14d
-install) into `Diablo II Decomp/data/`. d2d reads them from there
-(`--data`, in the launcher script); none are bundled (LEGAL.md). `d2d.cfg`,
-`d2d.log` and `save/` are written beside the binary (`HOME` points there).
+install, lowercase filenames) into `Diablo II Decomp/data/` either way. d2d
+reads them from there (`--data`, in the launcher script); none are bundled
+(LEGAL.md). `d2d.cfg`, `d2d.log` and `save/` are written beside the binary
+(`HOME` points there).
+
+## PortMaster packaging: how this was actually verified (2026-11-14)
+
+There's no public, authoritative spec doc for PortMaster's on-disk zip/
+`port.json` format beyond its own source, so this was reverse-engineered
+from a **real CrossMix OS install** (`CrossMix-OS_v1.3.0.zip`,
+`Apps/PortMaster/PortMaster/`), specifically the bundled `harbourmaster`
+Python package (`pylibs/harbourmaster/{captain,info,platform,hardware}.py`)
+that PortMaster's own GUI (`pugwash`/`pugscene.py`) calls into. This isn't
+guesswork dressed up as research — the actual zip this repo produces was
+**run through that real code** (`harbourmaster.captain.check_port()` and
+`harbourmaster.util.match_requirements()`, both imported directly from the
+CrossMix install's `pylibs/`) and it parses cleanly and would be shown to a
+TrimUI Smart Pro user. See `tools/trimui.sh`'s `trimui_package()` for the
+inline citations (file/line references) behind each design choice below.
+
+Key findings:
+
+- A port zip is one or more top-level directories (here: `Diablo II Decomp/`)
+  plus one or more top-level `*.sh` launchers (here: `Diablo II Decomp.sh`).
+  `.sh` files *inside* the directory aren't allowed.
+- A `<name>.port.json` at the top of the directory is the manifest (schema:
+  `harbourmaster/info.py`'s `PORT_INFO_*_ATTRS`, version 3). `name` and
+  `items` are always recomputed from the zip's own contents at install time,
+  so the file doesn't need to enumerate itself.
+- `min_glibc` is checked against the device's real glibc. `harbourmaster`'s
+  own static table has `"trimui-*": "2.33"` — independent confirmation that
+  Handkit's glibc 2.33 pin (VERSIONS.md) is exactly right for this device.
+- No `gptokeyb`/`gptokeyb2` needed: that translates gamepad input into
+  keyboard/mouse events for ports of PC games that only understand a
+  keyboard. d2d already reads SDL3 gamepad input natively
+  (`apps/d2d/gamepad_map.hpp`), the same as its Vita/Switch builds, so
+  there's nothing for a translation layer to do.
+- Dropping a zip into `PortMaster/autoinstall/` (e.g.
+  `/mnt/SDCARD/Apps/PortMaster/PortMaster/autoinstall/` on CrossMix OS) and
+  opening PortMaster installs it automatically on launch
+  (`PortMaster.sh`'s own "Autoinstallation Code") — this is the "I didn't
+  have to do anything else, it just showed up in the ports catalog"
+  experience other ports (DevilutionX, etc.) already give on this device.
+- No icon/art yet (would need placeholder, non-Blizzard art — real D2 art
+  can't ship per LEGAL.md). `attr.title`/`attr.desc` from `port.json` cover
+  PortMaster's own menu text without it; a `gameinfo.xml` + `.png` would
+  still improve the OS-level Ports-menu listing later.
 
 ## Not there yet (first things to find out on real hardware)
 
@@ -75,7 +123,8 @@ install) into `Diablo II Decomp/data/`. d2d reads them from there
   run on the device confirms it.
 - Network (LAN/TCP·IP join) is expected to work — this is real Linux, not
   a sandboxed console SDK like the Vita/Switch builds — but is untested here.
-- No PortMaster packaging metadata, no icon/art for the ports menu.
+- No icon/art for the ports menu (PortMaster packaging metadata itself is
+  now done and verified against real PortMaster code -- see above).
 - Audio backend is SDL3's through Handkit's build; OpenAL Soft's SDL3
   backend on it is untested beyond compiling.
 
