@@ -124,12 +124,19 @@ game data this port's `data/` folder expects is genuinely valid and that
 D2Decomp plays it correctly -- see STATUS.md's Milestone 4 for the full
 write-up, including one minor, non-blocking table-version warning found
 this way (`CubeMain.txt`, a Horadric Cube recipe count, 150 rows vs 1.14d's
-151 -- `check_patch_layer()` warns and continues, doesn't refuse).
+151; identified exactly: the `Token of Absolution` respec recipe and its
+four Essence inputs are entirely missing from this archive's data, not just
+this one row -- `check_patch_layer()` warns and continues, doesn't refuse;
+see STATUS.md Milestone 4 for the full diff against a reference
+CubeMain.txt).
 
 The same read of `docs/design/rendering.md` while here found `--widescreen`:
-now passed by the launcher by default, since without it d2d's view is a
-fixed 800x600 (4:3), pillarboxed on the Smart Pro/Brick's 16:9 1280x720
-panel.
+now passed by the launcher unconditionally. The Smart Pro (1280x720) and
+Brick (1024x768, a flat 4:3 -- CrossMix's own hardware table) don't share a
+resolution, but this flag doesn't need per-device logic: the view's width
+tracks the window's own aspect, so a 4:3 window computes right back to the
+unwidened 800x600 (a no-op) and the Smart Pro's 16:9 fills the screen --
+safe and correct on either model.
 
 ## Not there yet (first things to find out on real hardware)
 

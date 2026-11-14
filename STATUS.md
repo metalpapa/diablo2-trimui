@@ -388,24 +388,49 @@ has 150 rows, 1.14d's has 151 (a mod, or another version)` on load. Read
 deliberately tolerant structural heuristic ("Warns, doesn't refuse") that
 compares three tables' row counts against known-1.14d values; only
 `CubeMain.txt` (Horadric Cube recipes) was off, by one row --
-`ItemStatCost.txt` and `UniqueItems.txt` matched exactly. So this archive's
-`patch_d2.mpq` (the LoD one, used per the earlier "two patch_d2.mpq exist"
-note) is *very close* to 1.14d but not byte-identical -- likely missing or
-having a differently-ordered one cube recipe, not a sign of corruption or a
-wrong game entirely (everything else loaded and rendered correctly). Correcting
-the earlier "matches this archive's own 'V1.12-1.14d' naming" claim: that's
-still probably true for the base game version, but the patch layer itself
-isn't a confirmed byte-exact 1.14d. Not a blocker -- worth knowing about if a
-Horadric Cube recipe ever looks wrong on real hardware.
+`ItemStatCost.txt` and `UniqueItems.txt` matched exactly.
+
+**Identified exactly which recipe is missing (2026-11-14, follow-up)**: the
+user found and downloaded a community CubeMain.txt mod file (a Phrozen-Keep-
+style "upgrade Set items" mod, which starts from an unmodified 1.14d
+CubeMain.txt and adds 4 new rows on top). Diffing its 155 rows against this
+archive's 150 by `description` column: 4 of the mod's extra rows are its
+own "Upping Normal/Exceptional Set Armor/Weapon" additions (not vanilla), but
+the 5th is **vanilla**: `Token of Absolution` -- the recipe that lets a
+character fully respec (reset stat and skill points), added in patch 1.13.
+Its exact row: 4 inputs `tes`+`ceh`+`bet`+`fed` (the four Act-boss Hell-
+difficulty Essence drops: Twisted Essence of Suffering, Charged Essence of
+Hatred, Burning Essence of Terror, Festering Essence of Destruction) ->
+output `toa` (Token of Absolution).
+
+Checked deeper: this archive's `misc.txt` has **no** Essence items and **no**
+Token of Absolution item at all (not merely a dropped recipe row) --
+confirmed identical in both of the archive's `patch_d2.mpq` candidates (base
+install's 8 MB one and the LoD one actually used in `data/`, byte-identical
+MD5 on `CubeMain.txt`, so this isn't an artifact of picking the wrong one).
+So despite its "V1.12-1.14d" label, this specific archive's data doesn't
+include patch 1.13's Essence/respec content. **Not a blocker**: the base game
+is fully playable; the only effect is that one respec mechanic is
+unavailable, same as pre-1.13 retail. Not something to patch in this repo --
+that would mean shipping modified/third-party game data, which LEGAL.md and
+this whole project's stance rule out. If full 1.14d parity ever matters, the
+fix is the user's own: get an official 1.14d patch and drop it in as
+`data/patch_d2.mpq` (the launcher's `D2_PATCH_INSTALLER` env var, already
+documented in `tools/mpq-cat/README.md`, exists for exactly this).
 
 **Also fixed from reading `apps/d2d/docs/design/rendering.md` while here**:
 the TrimUI launcher now passes `--widescreen` to d2d. Without it the game's
-view is a fixed 800x600 (4:3), pillarboxed on the Smart Pro/Brick's 16:9
-1280x720 panel; `--widescreen` is a real, already-released, opt-in d2d flag
-("the world draws on the wide buffer around its centre; the HUD and panels
-run unchanged") made exactly for this. Re-validated with
+view is a fixed 800x600 (4:3), pillarboxed on a wider screen. Correction
+(2026-11-14): the Smart Pro and Brick don't share one resolution --
+CrossMix's own hardware table (`harbourmaster/hardware.py`) has Smart Pro at
+1280x720 (16:9) but **Brick at 1024x768 (a flat 4:3)**, so "the Smart
+Pro/Brick's 16:9 panel" above was wrong for the Brick. Kept `--widescreen`
+on unconditionally anyway, per the user: it's harmless either way --
+`rendering.md` says the view's width tracks "the window's aspect
+(800-1400)", so on an actual 4:3 window it computes right back to 800 wide
+(a no-op), and on the Smart Pro's 16:9 it fills the screen -- no per-device
+logic needed, no downside on either model. Re-validated with
 `harbourmaster.captain.check_port()` after the change: still parses clean.
-
 **Tried and stopped short**: wanted to also confirm the launcher's
 `export HOME="$GAMEDIR"` (so `d2d.cfg`/saves land beside the binary, not a
 real user's home) actually produces a save file, end to end. On macOS,
