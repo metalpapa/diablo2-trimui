@@ -1,5 +1,5 @@
 diff --git a/apps/d2d/gamemenu.cpp b/apps/d2d/gamemenu.cpp
-index a5706b35..b3fe0a98 100644
+index a5706b35..df076729 100644
 --- a/apps/d2d/gamemenu.cpp
 +++ b/apps/d2d/gamemenu.cpp
 @@ -43,6 +43,13 @@ struct Menu {
@@ -16,6 +16,15 @@ index a5706b35..b3fe0a98 100644
      { 0, false, "Exit", 0, 0, false, {} },
      { 0, false, "ReturnToGame", 0, 0, false, {} },
  };
+@@ -159,7 +166,7 @@ GameMenu::GameMenu() {
+ 
+ void GameMenu::show(int which) {
+     menu = which;
+-    sel = int(rows().size()) - 1;
++    sel = which == 0 ? 1 : int(rows().size()) - 1;   // main menu: the TrimUI "Save" row
+     held = drag = false;
+ }
+ 
 @@ -231,6 +238,7 @@ GameMenu::Action GameMenu::activate(const Scene& scene, Audio& audio) {
      if (row.type != 0) return kNone;
      Action action = kNone;
