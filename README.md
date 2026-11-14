@@ -51,7 +51,7 @@ diablo2-trimui/
 │   └── assets/             Port icons and box art
 ├── scripts/
 │   └── apply-overlay.sh   Copies overlay/ onto upstream/ (or any d2decomped checkout)
-└── upstream/              git submodule: github.com/psi29a/d2decomped
+└── upstream/              git submodule: fork github.com/metalpapa/d2decomped (branch trimui, from psi29a/d2decomped)
 ```
 
 ## Quick start
