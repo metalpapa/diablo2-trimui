@@ -1,5 +1,5 @@
 diff --git a/apps/d2d/gamemenu.cpp b/apps/d2d/gamemenu.cpp
-index a5706b35..df076729 100644
+index a5706b35..e644b36b 100644
 --- a/apps/d2d/gamemenu.cpp
 +++ b/apps/d2d/gamemenu.cpp
 @@ -43,6 +43,13 @@ struct Menu {
@@ -16,16 +16,18 @@ index a5706b35..df076729 100644
      { 0, false, "Exit", 0, 0, false, {} },
      { 0, false, "ReturnToGame", 0, 0, false, {} },
  };
-@@ -159,7 +166,7 @@ GameMenu::GameMenu() {
+@@ -159,8 +166,9 @@ GameMenu::GameMenu() {
  
  void GameMenu::show(int which) {
      menu = which;
 -    sel = int(rows().size()) - 1;
 +    sel = which == 0 ? 1 : int(rows().size()) - 1;   // main menu: the TrimUI "Save" row
      held = drag = false;
++    just_shown = true;
  }
  
-@@ -231,6 +238,7 @@ GameMenu::Action GameMenu::activate(const Scene& scene, Audio& audio) {
+ std::vector<int> GameMenu::rows() const {
+@@ -231,6 +239,7 @@ GameMenu::Action GameMenu::activate(const Scene& scene, Audio& audio) {
      if (row.type != 0) return kNone;
      Action action = kNone;
      if (row.name == "Options") show(1);                       // 0x47f2a0
@@ -33,11 +35,19 @@ index a5706b35..df076729 100644
      else if (row.name == "Exit") action = kExit;              // 0x47f2d0
      else if (row.name == "ReturnToGame") action = kClose;     // 0x47f300
      else if (row.name == "SoundOptions") {                    // 0x47f310; the sliders' init 47cdc0 / 47ce10
+@@ -311,6 +320,7 @@ GameMenu::Action GameMenu::input(const Scene& scene, Audio& audio, const Mouse&
+         if (held && hit(mouse.y) == sel) action = activate(scene, audio);
+         held = drag = false;
+     }
++    if (just_shown) { just_shown = false; last_x = mouse.x; last_y = mouse.y; }
+     if (mouse.x != last_x || mouse.y != last_y) {          // FUN_0047e3d0: a move drags or hovers
+         last_x = mouse.x; last_y = mouse.y;
+         if (held) slide(scene, audio, mouse.x, mouse.y);
 diff --git a/apps/d2d/gamemenu.hpp b/apps/d2d/gamemenu.hpp
-index f134dcb1..9fb5e328 100644
+index f134dcb1..669c8c6a 100644
 --- a/apps/d2d/gamemenu.hpp
 +++ b/apps/d2d/gamemenu.hpp
-@@ -25,7 +25,7 @@ std::vector<std::string_view> game_menu_images();
+@@ -25,12 +25,13 @@ std::vector<std::string_view> game_menu_images();
  // ramp. 3D sound, EAX, 3D bias and perspective are off as on a machine
  // without a 3D provider or Glide.
  struct GameMenu {
@@ -46,6 +56,12 @@ index f134dcb1..9fb5e328 100644
      bool open = false;
      bool expansion = true;                 // the video / automap menus' LoD rows (FUN_00408f20)
      int menu = 0, sel = 0;                 // 0x7bc93c's menu, 0x7bc938
+     bool held = false, drag = false;       // the left button / a slider (0x7bc948 / 0x7bc94c)
+     int last_x = -1, last_y = -1;          // where the mouse was (0x7bc980 / 0x7bc984)
++    bool just_shown = false;               // TrimUI: the first frame's cursor jump (the pad's) must not hover-select a row
+     int pent = 0;                          // pentspin's frame (0x7bc944)
+     std::uint32_t pent_ms = 0;
+     std::array<std::array<int, 8>, 5> value{};   // each row's value, by its LoD row
 diff --git a/apps/d2d/gamepad_map.hpp b/apps/d2d/gamepad_map.hpp
 index 57c27c39..a36e5922 100644
 --- a/apps/d2d/gamepad_map.hpp
