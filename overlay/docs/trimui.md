@@ -69,6 +69,40 @@ reads them from there (`--data`, in the launcher script); none are bundled
 (LEGAL.md). `d2d.cfg`, `d2d.log` and `save/` are written beside the binary
 (`HOME` points there).
 
+## Box art in the CrossMix OS Ports list (found 2026-11-14, real hardware)
+
+Neither install path above gives this port (or any manually-sideloaded
+port, including DevilutionX — confirmed by comparison) an icon in
+CrossMix OS's own "Ports" list. `port.json`'s `attr.image` and a
+`gameinfo.xml` beside the binary are both PortMaster-catalog/EmulationStation
+conventions that this device's frontend doesn't read for this view.
+
+The real convention was found by pulling `Roms/PORTS/PORTS_cache7.db`
+(a SQLite cache the frontend itself builds scanning that folder) off a
+real device and reading its schema: table `PORTS_roms`, column `imgpath`.
+For every `.sh` in `Roms/PORTS/`, the frontend expects a same-named `.png`
+in a **separate, top-level `Imgs/PORTS/` folder** (not nested under
+`Roms/`):
+
+```
+/mnt/SDCARD/Imgs/PORTS/Diablo II Decomp.png
+```
+
+Confirmed against a third-party port ("Celeste Classic") that already had
+real box art showing in the menu — its `.png` lives at exactly that path.
+Not part of `tools/trimui.sh package`'s output (it's an SD-wide, per-OS
+convention, not something a PortMaster zip controls), so it has to be
+copied there separately after installing, e.g.:
+
+```sh
+mkdir -p /mnt/SDCARD/Imgs/PORTS
+cp assets/diablo2decomp-icon.png "/mnt/SDCARD/Imgs/PORTS/Diablo II Decomp.png"
+```
+
+(or the mtools equivalent from the Mac — see `PORTMASTER-NOTES.md` at the
+repo root for the exact non-interactive mtools incantations and the
+gotchas around `mcopy`/`mmd`'s interactive prompts.)
+
 ## PortMaster packaging: how this was actually verified (2026-11-14)
 
 There's no public, authoritative spec doc for PortMaster's on-disk zip/
@@ -149,8 +183,11 @@ safe and correct on either model.
   run on the device confirms it.
 - Network (LAN/TCP·IP join) is expected to work — this is real Linux, not
   a sandboxed console SDK like the Vita/Switch builds — but is untested here.
-- No real icon/art (a plain placeholder is included — see above — but
-  nothing using actual D2 assets, which LEGAL.md rules out anyway).
+- No real icon/art for the bundled `diablo2decomp-icon.png` itself (a
+  plain placeholder monogram is included — see above — but nothing using
+  actual D2 assets, which LEGAL.md rules out anyway). The Ports-list
+  carátula *mechanism* is now documented above and confirmed working;
+  what's still just a generic placeholder is the artwork's content.
 - Audio backend is SDL3's through Handkit's build; OpenAL Soft's SDL3
   backend on it is untested beyond compiling.
 
