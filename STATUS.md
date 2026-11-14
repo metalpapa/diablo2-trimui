@@ -117,8 +117,8 @@ bzip2 pieces cached) before rebuilding.
   performance, save/load. Nobody has run this on a device. This is the one
   remaining unknown that actually matters — everything else in this file is
   "it compiles," not "it works."
-- Copying the packaged build + a legally owned, 1.14d-patched Diablo II + LoD
-  data folder onto a TrimUI's SD card and launching it via PortMaster/Ports.
+- Copying the packaged build (already staged with real game data — see
+  below) onto a TrimUI's SD card and launching it via PortMaster/Ports.
 - A fresh-machine/fresh-clone dry run of the whole pipeline end to end.
 - Submitting the FFmpeg/sysctl fix upstream to `psi29a/d2decomped` as a PR.
 
@@ -133,18 +133,49 @@ code found in a first pass (`grep -i trimui` came up empty) — it's a
 cross-platform engine port, not a TrimUI-specific one, so anything useful
 from it would be by analogy, not copy-paste.
 
-## Available game files (not yet used)
+## Game files: verified genuine, extracted, and staged (2026-11-14)
 
 `~/Downloads/Diablo II Complete (2000-01) [es-ES digital release] V1.12-1.14d/`
-has the official installer `.mpq` files (D2 1.12 + D2:LoD, es-ES, ~2.1 GB) —
-this is the source to extract the actual `d2data.mpq`, `d2exp.mpq`, etc. that
-`d2d --data <dir>` needs (README-trimui.txt in the packaged build explains
-the full list). **Not yet extracted or copied anywhere** — needs the
-installer run (or 7z/innoextract on the `.mpq`-named installer blobs, which
-despite the extension are Blizzard's old InstallShield packages, not game
-MPQs themselves) to get the real data files, then those get patched to
-1.14d and copied into `Diablo II Decomp/data/` on the SD card. This is a
-step for when actually testing on hardware, not before.
+turned out to need no installer run at all: despite being named like
+installers, `*.mpq` in that folder **are themselves real MPQ archives**
+(confirmed with `file` -> "MoPaQ (MPQ) archive", not an InstallShield/Inno
+format as first assumed) that directly contain the final game MPQs, readable
+with the pure-Python `mpyq` library (`pip install mpyq`) with no D2
+installation needed:
+
+| Tome | Contains |
+|---|---|
+| `D2 .../Installer Tome.mpq` | `d2data.mpq`, `d2sfx.mpq`, `d2speech.mpq` |
+| `D2 .../Installer Tome 2.mpq` | `d2video.mpq` |
+| `D2 .../Installer Tome 3.mpq` | `d2char.mpq`, `d2music.mpq`, `patch_d2.mpq` (base) |
+| `D2ES .../Installer Tome.mpq` | `D2xMusic.mpq`, `D2xVideo.mpq`, `d2exp.mpq`, `d2xtalk.mpq`, `patch_d2.mpq` (LoD) |
+
+All 12 extracted cleanly (`file` confirms every one is a valid MoPaQ archive,
+right sizes — e.g. `d2video.mpq` at ~595 MB, `d2data.mpq` at ~257 MB, both in
+line with known real D2 file sizes). **These are the real thing, not
+placeholders or corrupted downloads.**
+
+Two `patch_d2.mpq` exist (base install's, 8 MB; LoD's, 2 MB) because that's
+how the real Blizzard installer works too — LoD installs over the base game
+and its own `patch_d2.mpq` is the one that's actually left in place
+afterward, so **the LoD one is what got staged** (matches this archive's own
+"V1.12-1.14d" naming: base 1.12 + LoD's bundled patch = 1.14d final).
+
+**Found and fixed a real bug while verifying this**: `overlay/tools/trimui.sh`'s
+generated `README-trimui.txt` was missing `d2char.mpq` from the required-files
+list, even though `gamedata_load.cpp` calls `required("d2char.mpq")` (character
+animations — not optional, a miss there isn't a silent skip). Fixed; also
+added a note that filenames must be lowercase (confirmed in code: a Linux-only,
+case-sensitive filesystem won't find `D2xVideo.mpq`/`D2xMusic.mpq` as shipped
+by the installer archive — `install-detect.md` even lists "case-insensitive MPQ
+names" as a still-open loader TODO, so this isn't handled automatically yet).
+
+**Staged for hardware testing**: all 10 required MPQs + `d2char.mpq`, correctly
+renamed to lowercase, are sitting in
+`upstream/build/trimui-pak/Diablo II Decomp/data/` (~2.0 GB, gitignored —
+never committed, per LEGAL.md). The whole `trimui-pak/` folder is now ready to
+copy to a TrimUI's SD card (`/mnt/SDCARD/Roms/PORTS/`) the moment there's
+actual hardware to test on.
 
 ## Resume commands (same machine)
 

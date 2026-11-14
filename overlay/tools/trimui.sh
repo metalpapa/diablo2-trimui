@@ -257,9 +257,11 @@ Diablo II Decomp (d2d) for TrimUI Smart Pro / Brick — unverified build
 1. Copy this whole folder to /mnt/SDCARD/Roms/PORTS/ on the SD card.
 2. Create "Diablo II Decomp/data/" next to d2d and copy YOUR OWN, legally
    owned Diablo II + Lord of Destruction MPQ files into it (the same
-   files d2d's README calls --data: d2data.mpq, d2exp.mpq, d2sfx.mpq,
-   d2music.mpq, d2video.mpq, d2xvideo.mpq, d2xmusic.mpq, d2speech.mpq,
-   d2xtalk.mpq, patch_d2.mpq), from a 1.14d install. No game files are
+   files d2d's README calls --data: d2data.mpq, d2char.mpq, d2exp.mpq,
+   d2sfx.mpq, d2music.mpq, d2video.mpq, d2xvideo.mpq, d2xmusic.mpq,
+   d2speech.mpq, d2xtalk.mpq, patch_d2.mpq), from a 1.14d install. Names
+   must be lowercase (Linux is case-sensitive; the original installer's
+   D2xVideo.mpq/D2xMusic.mpq need renaming). No game files are
    bundled or distributed with d2d itself (LEGAL.md).
 3. From CrossMix OS's PortMaster app (or the Ports menu), launch
    "Diablo II Decomp".
