@@ -287,6 +287,38 @@ fixed (logged here, not blocking)**:
   `data\local\UI\<LANG>\` subfolder actually exists in the loaded MPQs) and
   threading that through every hardcoded `ENG`/`LATIN` path -- a real, non-
   trivial upstream fix, not attempted tonight.
+
+**Third known issue, found and root-caused 2026-11-14 (crash-on-quit, not
+blocking)**: exiting from in-game back to the title screen ("Save and
+Exit") reliably crashes the process with glibc's `double free or
+corruption (!prev)` -> `SIGABRT`, 100% reproducible across 3 separate real-
+hardware runs. Root-caused with a custom crash handler (`sigaction` +
+`SA_SIGINFO`, reading `ucontext_t.uc_mcontext.pc` -- see
+`PORTMASTER-NOTES.md` for the general technique) plus `llvm-addr2line`
+against the unstripped local build. The backtrace is entirely inside
+OpenAL Soft's own teardown, not d2d's game logic:
+```
+d2d::client::Audio::~Audio() (apps/d2d/audio.hpp:164)
+  -> ALCcontext::~ALCcontext() (OpenAL's context.cpp:157)
+    -> destroying its Voice array
+      -> each Voice's std::unique_ptr<DecoderBase> (OpenAL's own ambisonic/
+         UHJ decoder, core/uhjfilter.h) double-freed on reset
+```
+Leading theory: OpenAL Soft runs its mixer on a background thread; `Audio::
+~Audio()` stops sources and waits on `music_job`, but never calls
+`alcSuspendContext(ctx)` before `alcDestroyContext(ctx)` -- if the mixer
+thread is still touching a Voice's decoder at that exact moment, that's a
+classic teardown race ending in a double free. Not yet fixed (one-line,
+low-risk candidate fix: `alcSuspendContext(ctx)` before stopping sources),
+because **it has zero observable effect on the player**: the character
+save already happens before this point in every run (`save Kain: written`
+in the log precedes the crash every single time), and `Diablo II Decomp.sh`
+has no `set -e`/exit-code check around the `./d2d ...` call -- `pm_finish`
+runs unconditionally right after, so control returns to the frontend menu
+exactly like a clean exit either way. Left as a known, documented,
+non-blocking bug per the user's call; revisit if real audio glitches show
+up (none observed/expected during actual play, since this only triggers
+at the very end of the process's life).
 - **No FPS counter exists in d2d** (only `--fps-cap`, a *limiter*, not a
   *display*) -- confirmed by grep, nothing to enable. Can't currently
   quantify a reported "rain effect feels laggy" -- noted, not measured.
