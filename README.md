@@ -73,6 +73,52 @@ tools/trimui.sh all      # build/trimui-pak/ comes out the other end
 Then follow `upstream/docs/trimui.md` ("Where its files go") to copy the
 result and your own MPQs to the SD card.
 
+## Copying files to the console's SD card (macOS, mtools)
+
+This is the method used for every install and update of this port. The SD
+shows up as a FAT32 volume called `CROSSMIX`, but nothing is mounted in
+Finder: files are read and written straight on the raw disk with
+[mtools](https://www.gnu.org/software/mtools/) (`brew install mtools`).
+Details and gotchas are in `PORTMASTER-NOTES.md` (in Spanish).
+
+```sh
+# The disk number changes between connections: ask, never assume.
+DEVICE=$(diskutil info "CROSSMIX" | awk -F': *' '/Device Node/ {print $2}')
+RDEVICE=$(echo "$DEVICE" | sed 's#/dev/disk#/dev/rdisk#')   # raw disk: rdisk, not disk
+
+sudo mdir  -i "$RDEVICE" "::/Data/ports/diablo2decomp/"                       # list
+sudo mdel  -i "$RDEVICE" "::/Data/ports/diablo2decomp/d2d"                    # delete first...
+sudo mcopy -i "$RDEVICE" "build/trimui-pak/Diablo II Decomp/d2d" \
+                         "::/Data/ports/diablo2decomp/d2d" </dev/null         # ...then copy in
+sudo mcopy -n -i "$RDEVICE" "::/Data/ports/diablo2decomp/.config/d2d/d2d.cfg" /tmp/d2d.cfg   # copy out
+```
+
+Rules that keep it from hanging:
+
+- `::` before a path means "the drive given with `-i`".
+- Always `mdel` the destination before `mcopy`. If the file exists, `mcopy`
+  asks "overwrite y/n?", and when the script's output goes to a log file
+  that question is invisible and the script looks frozen. Also redirect
+  stdin from `/dev/null` on `mcopy`.
+- Never call `mmd` (make folder) blindly: if the folder exists it loops on
+  a hidden menu. Check first: `mdir ... >/dev/null 2>&1 || mmd ...`.
+- Run `sudo -v` once at the top of a script so every later `sudo` reuses
+  the password, and send the script's whole output to a log file
+  (`{ ...; } > /tmp/name.log 2>&1`) so a result can be read afterwards
+  without pasting anything.
+- Eject the SD in Finder before putting it back in the console; the game
+  writes `d2d.log`, `launcher.log` and saves under
+  `Data/ports/diablo2decomp/` and they can be read back the same way.
+
+Where things go on the SD (see `overlay/docs/trimui.md` for the rest):
+
+| What | SD path |
+|---|---|
+| Launcher | `Roms/PORTS/Diablo II Decomp.sh` |
+| Game folder (binary, `data/` with your MPQs) | `Data/ports/diablo2decomp/` |
+| Config, saves, game log | `Data/ports/diablo2decomp/.config/d2d/` |
+| Box art shown in the Ports list | `Imgs/PORTS/<script name>.png` |
+
 ## Credits
 
 - [D2Decomp](https://github.com/psi29a/d2decomped) by psi29a and
