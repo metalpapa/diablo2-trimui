@@ -407,8 +407,19 @@ fi
 # Logged to launcher.log beside d2d's own d2d.log: this frontend shows
 # nothing on screen if the game exits early, so without this a crash here
 # is invisible, exactly as happened on the first real-hardware attempt.
+# The console's exit chord (Menu + Start) is gptokeyb's: it kills the
+# process it is told to watch. Started with no config it maps no buttons
+# (DevilutionX and Fallout launch it the same way on this device), so d2d
+# still reads the pad natively.
+if [ -n "$GPTOKEYB" ]; then
+    $ESUDO chmod 666 /dev/uinput 2>/dev/null
+    $GPTOKEYB "d2d" &
+    sleep 0.6   # TrimUI Smart Pro: gptokeyb needs a moment before the game opens the pad
+fi
+
 ./d2d --data "$GAMEDIR/data" --widescreen $FIRST_RUN_ARGS "$@" > "$GAMEDIR/launcher.log" 2>&1
 
+[ -n "$GPTOKEYB" ] && $ESUDO kill -9 $(pidof gptokeyb) 2>/dev/null
 command -v pm_finish >/dev/null 2>&1 && pm_finish
 EOF
     chmod +x "$out/Diablo II Decomp.sh" "$pak/d2d"

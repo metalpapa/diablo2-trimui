@@ -350,6 +350,13 @@ at the very end of the process's life).
 - **Box art**: `overlay/assets/*-boxart.png` (640x480) go to
   `/Imgs/PORTS/<script name>.png` on the SD.
 
+- **Menu + Start exit chord (2026-11-15):** confirmed by reading Fallout's and
+  DevilutionX's launchers on the device: they start `$GPTOKEYB "<process>" &`
+  (with no config for DevilutionX), and that tool kills the game on the
+  chord. The launcher now does the same for `d2d` (guarded by
+  `[ -n "$GPTOKEYB" ]`); d2d still reads the pad natively. The in-game
+  Menu/Select + Start hold in `main.cpp` stays as a fallback.
+
 ## What hasn't been attempted at all yet
 
 - **Anything on real TrimUI hardware**: display, audio, controls,
