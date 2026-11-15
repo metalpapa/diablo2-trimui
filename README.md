@@ -119,6 +119,108 @@ Where things go on the SD (see `overlay/docs/trimui.md` for the rest):
 | Config, saves, game log | `Data/ports/diablo2decomp/.config/d2d/` |
 | Box art shown in the Ports list | `Imgs/PORTS/<script name>.png` |
 
+## Estado del trabajo y contexto de la sesión (2026-11-15)
+
+Esta sección es para retomar el trabajo en otra sesión (o con otro agente).
+Todo lo de abajo se hizo y se probó en una TrimUI Smart Pro real con CrossMix
+OS, salvo lo marcado como "sin probar".
+
+### Repos y ramas
+
+- Este repo: rama de trabajo `experimental/sdl-3.4` (sale de
+  `experimental/deps-update`; `main` quedó con SDL 3.2.10 y sin lo de abajo).
+- `upstream/` es un **submódulo apuntando a un fork propio**,
+  `github.com/metalpapa/d2decomped`, con las mismas ramas (`trimui`,
+  `experimental/deps-update`, `experimental/sdl-3.4`). El remoto `fork` es el
+  fork; `origin` sigue siendo `psi29a/d2decomped`. Los cambios de código viven
+  en el fork; `overlay/patches/` guarda además un parche de respaldo.
+- `vendor/handkit` (Handkit de code-beans) tiene cambios locales sin commitear
+  para SDL 3.4.20; están guardados como `overlay/handkit-patches/handkit-sdl-3.4.20.patch`
+  y `scripts/apply-overlay.sh` los aplica. Si `git status` muestra `m vendor/handkit`
+  es esperado.
+
+### Compilar y desplegar
+
+```sh
+export HANDKIT_SDK=$PWD/vendor/handkit
+cd upstream
+TRIMUI_PERF=1 tools/trimui.sh build      # -mcpu=cortex_a53; sin TRIMUI_PERF compila genérico
+tools/trimui.sh package                  # build/trimui-pak (binario ya sin símbolos de depuración)
+# el binario completo, con símbolos, queda en build/trimui/d2d/apps/d2d/d2d (para llvm-addr2line)
+cd .. && overlay/tools/sd-install.sh --binary "upstream/build/trimui-pak/Diablo II Decomp/d2d" \
+    --launcher "upstream/build/trimui-pak/Diablo II Decomp.sh" --cfg show_fps=1
+```
+
+`overlay/tools/sd-install.sh` es el método de copia a la SD (mtools, ver sección
+anterior). Los scripts y binarios sueltos de `/tmp` (`trimui-test-fps.sh`,
+`d2d-*-*`) se pierden al apagar la Mac: se regeneran con los comandos de arriba.
+La SD debe estar conectada y con la etiqueta `CROSSMIX`.
+
+### Qué se hizo
+
+- **Guardar:** fila "Save" en el menú de pausa (seleccionada por defecto), `sync()`
+  tras escribir el `.d2s` (un guardado se perdía por corte de energía), etiqueta
+  `SAVE`/`SALVAR` en `overlay/assets/labels/` metida en `trimui_save_patch.mpq`
+  (`overlay/tools/mpq_add.c` y `encode_dc6.py` la arman).
+- **Idioma:** `lang = ESP` en `d2d.cfg`; textos y arte de menús salen en español.
+- **Controles:** A sobre salidas de nivel (cuevas, escaleras); R1 muestra/oculta
+  el mapa y los nombres de ítems (`automap_items = 1`); B cierra paneles (también
+  el árbol de habilidades) cuando el cursor no está sobre un ítem o habilidad;
+  con un ítem en la mano B lo suelta; mantener A con el inventario abierto equipa
+  (armadura, armas, escudos, anillos, cinturones); con el baúl abierto mueve el
+  ítem entre inventario y baúl (barra de progreso); el cursor salta a huecos
+  donde el ítem cabe; el Nigromante levanta esqueletos del cadáver más cercano.
+- **Velocidad del juego:** Start > Options > Video Options > Game Speed
+  (0.5x-1.5x, el medio es normal; `game_speed` en `d2d.cfg`).
+- **Salir:** el launcher arranca `gptokeyb` como Fallout/DevilutionX, así que
+  Menu + Start cierra el juego. El botón Menu no llega a SDL (lo toma el
+  sistema); dentro del juego hay además un respaldo con Select + Start.
+- **Visual:** `scalemode = linear` se ve mejor que `nearest`.
+- **Dependencias:** SDL 3.4.20 (Handkit compila sin cambios), zlib 1.3.2.
+  OpenAL se queda en 1.24.3 (1.25 necesita módulos C++20 que no funcionan aquí).
+- **Rendimiento:** binario sin símbolos (316 MB a 11 MB); suelo con luz con una
+  sola escritura de 32 bits por píxel (`Lighting::rgba`, comparado byte a byte
+  con el original en `tests/test_tile_blit.cpp`); limpieza del cuadro y lluvia
+  más rápidas. De 22 a 27-32 fps en el campamento.
+- **Memoria:** los niveles construidos nunca se liberan y se precargan todos los
+  vecinos; en 1 GB de RAM la sesión se arrastraba a 3 fps tras ir por un portal.
+  Ahora no se precarga con menos de 220 MB libres.
+
+### Diagnóstico (lo que escribe `d2d.log`, en `Data/ports/diablo2decomp/.config/d2d/`)
+
+- `alive: ... (N fps) | render avg=... present avg=...` cada 5 s.
+- `phases (ms/frame): clear floor+shadow walls+units post-world hud rain labels wide-copy automap`
+  dónde se va el tiempo de dibujado.
+- `sys: cpu0=... kHz gov=... temp0=... memavail=... rss=... load=...`: frecuencia,
+  temperatura (mili°C), memoria libre y del proceso.
+- `pad button N down` / `joystick button N down`: qué botones llegan al juego.
+- `show_fps = 1` en `d2d.cfg` dibuja fps y ms arriba a la izquierda.
+- Medidas del equipo: CPU fija a 2 GHz en `performance`, 57-67 °C jugando,
+  la memoria es lenta (cada pasada completa por el cuadro cuesta ~3 ms).
+
+### Sin probar todavía en la consola
+
+Binario V (el último): mantener A para equipar armas/anillos, B para soltar,
+guardar/sacar del baúl con A, B cierra el árbol de habilidades, esqueletos del
+Nigromante, Game Speed, Menu + Start (el launcher con `gptokeyb`; `launcher.log`
+terminó con `Killed`, que parece ser eso), y que el límite de memoria evite la
+caída de fps tras un portal (buscar `memory tight` en el log).
+
+### Pendiente / ideas
+
+- Etiqueta "GUARDAR" real para la fila Save del menú en español (hoy cae a `SAVE`).
+- Videos de intro y `keyconfig` siguen fijos en `ENG`.
+- Aviso en pantalla cuando falla un guardado (hoy solo va al log).
+- El cierre normal del juego aborta en OpenAL (`double free` al destruir el
+  contexto); no afecta al guardado. Idea: `alcSuspendContext` antes de destruir.
+- Liberar niveles lejanos en vez de solo no precargar (requiere revisar el
+  estado por nivel; hoy los niveles construidos se quedan).
+- Optimizar paneles (inventario/baúl cuestan 12-20 ms con todo abierto) y los
+  ~10 ms de dibujado que aún no están medidos (antes de `render_ingame`).
+- Calibración de batería: no hay herramienta conocida en CrossMix; se puede
+  loguear voltaje y porcentaje desde `/sys/class/power_supply` si hace falta.
+- Subir `main` a SDL 3.4.20 y zlib 1.3.2 cuando haya sesiones largas sin problemas.
+
 ## Credits
 
 - [D2Decomp](https://github.com/psi29a/d2decomped) by psi29a and
