@@ -121,14 +121,14 @@ cmake --build "$build/openal-build" --target install
     # tarball doesn't, so a tiny one is written into its source tree here.
     zbz=$PWD/$build/zbz-deps
     if [[ ! -f $zbz/lib/libz.a ]]; then
-        zlib_src=$build/zlib-1.3.1
+        zlib_src=$build/zlib-1.3.2
         if [[ ! -d $zlib_src ]]; then
-            if [[ -f $vendor_dir/zlib-1.3.1.tar.gz ]]; then
-                cp "$vendor_dir/zlib-1.3.1.tar.gz" "$build/zlib.tar.gz"
+            if [[ -f $vendor_dir/zlib-1.3.2.tar.gz ]]; then
+                cp "$vendor_dir/zlib-1.3.2.tar.gz" "$build/zlib.tar.gz"
             else
-                curl -fsSLo "$build/zlib.tar.gz" https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+                curl -fsSLo "$build/zlib.tar.gz" https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz
             fi
-            sha256_check "$build/zlib.tar.gz" 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+            sha256_check "$build/zlib.tar.gz" bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
             mkdir -p "$zlib_src.part" && tar -xzf "$build/zlib.tar.gz" -C "$zlib_src.part" --strip-components=1
             mv "$zlib_src.part" "$zlib_src"
         fi
@@ -218,7 +218,17 @@ EOF
     # Conan's generated toolchain passing an explicit -stdlib=libc++ that
     # Zig's cross driver already defaults to and then reports unused;
     # harmless, but d2decomped's own code treats warnings as errors.
+    # TRIMUI_PERF=1: tune for the A133P's in-order Cortex-A53 cores (the
+    # generic armv8-a default schedules for nothing in particular). No LTO:
+    # CMake's IPO needs an LTO-aware ar the Handkit toolchain doesn't expose
+    # (libstorm.a fails to archive, exit 127).
+    perf_args=()
+    if [[ ${TRIMUI_PERF:-0} == 1 ]]; then
+        perf_args=(-DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG -mcpu=cortex_a53" \
+                   -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -mcpu=cortex_a53")
+    fi
     cmake --fresh -S . -B "$build/d2d" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        ${perf_args[@]+"${perf_args[@]}"} \
         -DD2D_GAME_ONLY=ON -DD2D_BUNDLED_STORMLIB=ON -DD2D_BUNDLED_FFMPEG=ON \
         -DD2D_WERROR=OFF \
         -DCMAKE_TOOLCHAIN_FILE="$d2d_toolchain" \

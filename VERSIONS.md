@@ -13,7 +13,7 @@ are mirrored under `vendor/sources/`, and the two moving-target projects
 | Zig (cross C/C++ compiler) | 0.14.1 | `vendor/sources/zig-*-0.14.1.tar.xz` | used successfully |
 | SDL3 (Handkit's `handkit-sdl` recipe) | **3.2.30** (experimental branch; main is 3.2.10) | `vendor/sources/SDL3-3.2.30.tar.gz` (sha256 `4c3b0933...42e3d`, matches GitHub's release digest) | built OK with Handkit's backend, d2d links; not run on device |
 | OpenAL Soft | **1.24.3**, not 1.25.x | `vendor/sources/openal-soft-1.24.3.tar.gz` | built OK |
-| zlib | 1.3.1 | `vendor/sources/zlib-1.3.1.tar.gz` | built OK |
+| zlib | **1.3.2** (experimental branch; main is 1.3.1) | `vendor/sources/zlib-1.3.2.tar.gz` (sha256 `bb329a0a...19d16`, matches GitHub digest) | built OK |
 | bzip2 | 1.0.8 | `vendor/sources/bzip2-1.0.8.tar.gz` | built OK (custom CMakeLists, see trimui.sh) |
 | FFmpeg (Bink-only, built by D2Decomp's own CMake) | 9.0.2 | `vendor/sources/ffmpeg-9.0.2.tar.xz` | built OK (`overlay/patches/`, see STATUS.md) |
 | CLI11 (header-only, FetchContent in D2Decomp's CMake) | 2.6.2 | `vendor/sources/cli11-2.6.2.tar.gz` | built OK |
