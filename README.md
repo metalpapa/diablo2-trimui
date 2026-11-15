@@ -278,6 +278,27 @@ se confunden con la lluvia, los paneles abiertos y el calor.
 12. **Batería**: loguear voltaje y porcentaje desde `/sys/class/power_supply`
     junto con la temperatura, para ver a qué voltaje se apaga y qué marcaba.
 
+### Fallo observado, sin investigar (2026-11-15)
+
+Mantener A sobre un ítem con el inventario abierto **equipa bien dentro de una
+mazmorra, pero en el pueblo se confunde** (el aviso y el resultado no son los de
+equipar). Hipótesis, de más a menos probable:
+
+1. En el pueblo el baúl (`stash_open`) o una tienda (`store.npc`) queda abierto o
+   se abre junto al inventario, y entonces mantener A pasa a "mover al baúl" o
+   "guardar" (`PadHoldKind::Move` / `Stow` en `drive_pad_hold`,
+   `apps/d2d/town/input.cpp`) en lugar de equipar. Con el baúl abierto el
+   comportamiento es ese a propósito.
+2. En el pueblo `item_use` / `item_use_action` cambia lo permitido por estar en
+   ciudad (tomos, pergaminos) y el ítem deja de contar como equipable.
+3. El cursor cae sobre el panel del baúl (a la izquierda) y no sobre el inventario.
+
+Cómo comprobarlo: repetir en el pueblo con el baúl cerrado y lejos de cualquier
+NPC; mirar qué texto sale abajo (`to equip`, `to store`, `to take out`). Si sale
+`store` o `take out`, es la hipótesis 1. Para ver el estado exacto, añadir al log
+una línea con `stash_open`, `store.npc`, `held` y el `kind` elegido al empezar
+cada hold.
+
 ### Cómo anotar los resultados
 
 Cada prueba nueva: una fila en la tabla de arriba con binario/cambio,
