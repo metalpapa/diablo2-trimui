@@ -113,6 +113,7 @@ SD); copy them to `Imgs/PORTS/Diablo II Decomp.png` and
 - `lang = ESP` (default `ENG`): which `data\local\{LNG,UI}\<lang>\` folder
   strings and menu art load from. Needed for a non-English install such as
   the es-ES release; upstream always read `ENG`.
+- `show_fps = 1`: frames a second and render ms, top left.
 - `automap_items = 1`: the automap key (R1 by default) also shows/hides the
   names of items on the ground.
 - `patch = <path>`: an extra MPQ layered on top (used for the "Save" menu
