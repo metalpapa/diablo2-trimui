@@ -114,6 +114,7 @@ SD); copy them to `Imgs/PORTS/Diablo II Decomp.png` and
   strings and menu art load from. Needed for a non-English install such as
   the es-ES release; upstream always read `ENG`.
 - Hold Menu + Start (or Select + Start) for a second: leave at once without saving (any screen).
+- `game_speed = 0..10`: the Video Options slider (Start > Options > Video Options > Game Speed), 5 = normal, 0.5x to 1.5x; the game clock runs at that rate in single player.
 - `show_fps = 1`: frames a second and render ms, top left.
 - `automap_items = 1`: the automap key (R1 by default) also shows/hides the
   names of items on the ground.
