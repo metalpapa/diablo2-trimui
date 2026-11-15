@@ -11,7 +11,7 @@ are mirrored under `vendor/sources/`, and the two moving-target projects
 | D2Decomp (game engine) | commit `beb487b` (2026-11-14) | git submodule `upstream/` | **builds a full aarch64 `d2d` binary** |
 | Handkit (toolchain + SDL3 backend) | commit `05e661f` | git submodule `vendor/handkit/` | toolchain+SDL3 built OK |
 | Zig (cross C/C++ compiler) | 0.14.1 | `vendor/sources/zig-*-0.14.1.tar.xz` | used successfully |
-| SDL3 (Handkit's `handkit-sdl` recipe) | **3.2.30** (experimental branch; main is 3.2.10) | `vendor/sources/SDL3-3.2.30.tar.gz` (sha256 `4c3b0933...42e3d`, matches GitHub's release digest) | built OK with Handkit's backend, d2d links; not run on device |
+| SDL3 (Handkit's `handkit-sdl` recipe) | **3.4.20** (branch `experimental/sdl-3.4`; `experimental/deps-update` has 3.2.30, main 3.2.10) | `vendor/sources/SDL3-3.4.20.tar.gz` (sha256 `f3bb06f5...8581f`, matches GitHub digest) | Handkit's backend compiles unchanged against it and d2d links; **runtime on device untested** (3.4 changed SDL internals; also enables the real `pixelart` scale mode) |
 | OpenAL Soft | **1.24.3**, not 1.25.x | `vendor/sources/openal-soft-1.24.3.tar.gz` | built OK |
 | zlib | **1.3.2** (experimental branch; main is 1.3.1) | `vendor/sources/zlib-1.3.2.tar.gz` (sha256 `bb329a0a...19d16`, matches GitHub digest) | built OK |
 | bzip2 | 1.0.8 | `vendor/sources/bzip2-1.0.8.tar.gz` | built OK (custom CMakeLists, see trimui.sh) |

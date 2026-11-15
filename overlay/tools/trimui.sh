@@ -67,7 +67,7 @@ trimui_configure() {
     mkdir -p "$deps"
     cat > "$deps/conanfile.txt" <<'EOF'
 [requires]
-handkit-sdl/3.2.30
+handkit-sdl/3.4.20
 [tool_requires]
 handkit-toolchain/0.14.1
 [generators]

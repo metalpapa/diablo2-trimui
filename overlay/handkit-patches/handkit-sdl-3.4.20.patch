@@ -1,5 +1,5 @@
 diff --git a/README.md b/README.md
-index 0f940c7..e90bac9 100644
+index 0f940c7..253ab40 100644
 --- a/README.md
 +++ b/README.md
 @@ -39,7 +39,7 @@ Today, porters do the left column by hand: a Debian chroot, a cross-compiler, a
@@ -7,12 +7,12 @@ index 0f940c7..e90bac9 100644
  | --- | --- |
  | **Toolchain** | A pinned, checksum-verified Zig/Clang 19 cross-compiler that builds ARM64 Linux binaries against glibc 2.33, for compatible firmwares. Original ArkOS needs a separate build against an older glibc baseline. Runs on macOS and Linux, ARM64 and x86_64. |
 -| **SDL3** | SDL 3.2.10 with a fullscreen backend for the handhelds' framebuffer GPU drivers: PowerVR on TrimUI's A133P, Mali on Anbernic's H700. Statically linked; the firmware provides only glibc and the GPU driver. |
-+| **SDL3** | SDL 3.2.30 with a fullscreen backend for the handhelds' framebuffer GPU drivers: PowerVR on TrimUI's A133P, Mali on Anbernic's H700. Statically linked; the firmware provides only glibc and the GPU driver. |
++| **SDL3** | SDL 3.4.20 with a fullscreen backend for the handhelds' framebuffer GPU drivers: PowerVR on TrimUI's A133P, Mali on Anbernic's H700. Statically linked; the firmware provides only glibc and the GPU driver. |
  | **Helper library** | Controls through SDL's gamepad mapping and a NextUI-style in-game menu. TrimUI integration adds power, sleep, volume, LEDs and rumble; the ArkOS target leaves system controls to the firmware. |
  | **Packaging** | `hk_add_pak()` in CMake builds a NextUI/MinUI `.pak` folder; `tools/handkit deploy` installs it over USB. |
  | **Starter and demo** | A minimal app to copy, and a demo that switches between software, OpenGL ES 2D and Vulkan 3D rendering. |
 diff --git a/recipes/handkit-sdl/conandata.yml b/recipes/handkit-sdl/conandata.yml
-index ef1730c..823a479 100644
+index ef1730c..35f0366 100644
 --- a/recipes/handkit-sdl/conandata.yml
 +++ b/recipes/handkit-sdl/conandata.yml
 @@ -1,4 +1,4 @@
@@ -20,11 +20,11 @@ index ef1730c..823a479 100644
 -  "3.2.10":
 -    url: https://github.com/libsdl-org/SDL/releases/download/release-3.2.10/SDL3-3.2.10.tar.gz
 -    sha256: f87be7b4dec66db4098e9c167b2aa34e2ca10aeb5443bdde95ae03185ed513e0
-+  "3.2.30":
-+    url: https://github.com/libsdl-org/SDL/releases/download/release-3.2.30/SDL3-3.2.30.tar.gz
-+    sha256: 4c3b09330d866dc52eb65b66259a6684ad387252ca8c57901b3a2b534eb42e3d
++  "3.4.20":
++    url: https://github.com/libsdl-org/SDL/releases/download/release-3.4.20/SDL3-3.4.20.tar.gz
++    sha256: f3bb06f55bed9557227a700af2ea62e49497ebdf58037732a731a5fb3ef8581f
 diff --git a/recipes/handkit-sdl/conanfile.py b/recipes/handkit-sdl/conanfile.py
-index ba4e15b..ed8ef5d 100644
+index ba4e15b..61ff656 100644
 --- a/recipes/handkit-sdl/conanfile.py
 +++ b/recipes/handkit-sdl/conanfile.py
 @@ -7,7 +7,7 @@ from conan.tools.files import copy, get
@@ -32,12 +32,12 @@ index ba4e15b..ed8ef5d 100644
  class HandkitSDL(ConanFile):
      name = "handkit-sdl"
 -    version = "3.2.10"
-+    version = "3.2.30"
++    version = "3.4.20"
      package_type = "static-library"
      settings = "os", "arch", "compiler", "build_type"
      options = {"glibc_version": ["2.33"]}
 diff --git a/recipes/handkit/conanfile.py b/recipes/handkit/conanfile.py
-index 65e8ace..0640815 100644
+index 65e8ace..807bd0d 100644
 --- a/recipes/handkit/conanfile.py
 +++ b/recipes/handkit/conanfile.py
 @@ -23,7 +23,7 @@ class Handkit(ConanFile):
@@ -45,17 +45,17 @@ index 65e8ace..0640815 100644
  
      def requirements(self):
 -        self.requires("handkit-sdl/3.2.10", transitive_headers=True, transitive_libs=True)
-+        self.requires("handkit-sdl/3.2.30", transitive_headers=True, transitive_libs=True)
++        self.requires("handkit-sdl/3.4.20", transitive_headers=True, transitive_libs=True)
  
      def build_requirements(self):
          self.tool_requires("handkit-toolchain/0.14.1")
 diff --git a/src/platform/sdl_handkit_video.c b/src/platform/sdl_handkit_video.c
-index 32929c0..142e90c 100644
+index 32929c0..27caf23 100644
 --- a/src/platform/sdl_handkit_video.c
 +++ b/src/platform/sdl_handkit_video.c
 @@ -1,4 +1,4 @@
 -/* Fullscreen fbdev EGL backend for SDL 3.2.10: PowerVR (TrimUI A133P) and Mali (Anbernic H700).
-+/* Fullscreen fbdev EGL backend for SDL 3.2.30: PowerVR (TrimUI A133P) and Mali (Anbernic H700).
++/* Fullscreen fbdev EGL backend for SDL 3.4.20: PowerVR (TrimUI A133P) and Mali (Anbernic H700).
   * Uses SDL's private-driver extension point; upstream SDL is unmodified.
   * PowerVR's NULL window system takes native window 0; Mali's fbdev EGL takes a pointer
   * to the window size. The framebuffer is queried for dimensions only; GPU swap presents frames.
