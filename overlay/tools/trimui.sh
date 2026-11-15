@@ -67,7 +67,7 @@ trimui_configure() {
     mkdir -p "$deps"
     cat > "$deps/conanfile.txt" <<'EOF'
 [requires]
-handkit-sdl/3.2.10
+handkit-sdl/3.2.30
 [tool_requires]
 handkit-toolchain/0.14.1
 [generators]
@@ -257,6 +257,10 @@ trimui_package() {
     pak="$out/Diablo II Decomp"
     rm -rf "$pak" && mkdir -p "$pak/data"
     cp "$build/d2d/apps/d2d/d2d" "$pak/"
+    # The build's binary is ~316 MB of debug info around ~11 MB of code; ship it stripped
+    # (the unstripped one stays in $build/d2d/apps/d2d/ for llvm-addr2line on crashes).
+    objcopy=${OBJCOPY:-$(command -v llvm-objcopy || ls /opt/homebrew/opt/llvm/bin/llvm-objcopy 2>/dev/null || true)}
+    if [[ -n $objcopy ]]; then "$objcopy" --strip-all "$pak/d2d"; else echo "trimui.sh: no llvm-objcopy, shipping the unstripped binary" >&2; fi
 
     cat > "$pak/data/README-put-your-mpq-files-here.txt" <<'EOF'
 Put your own, legally owned Diablo II + Lord of Destruction (1.14d) MPQ

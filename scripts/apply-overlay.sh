@@ -36,4 +36,20 @@ for patch in "$overlay"/patches/*.patch; do
     fi
 done
 
+# Same idea for the Handkit checkout: the SDL bump (3.2.10 -> 3.2.30) lives
+# in overlay/handkit-patches/ because vendor/handkit is code-beans' repo.
+handkit=$(dirname "$0")/../vendor/handkit
+if [[ -e $handkit/.git ]]; then
+    handkit=$(cd "$handkit" && pwd)
+    for patch in "$overlay"/handkit-patches/*.patch; do
+        [[ -e $patch ]] || continue
+        if git -C "$handkit" apply --reverse --check "$patch" 2>/dev/null; then
+            echo "Already applied: $(basename "$patch")"
+        else
+            git -C "$handkit" apply "$patch"
+            echo "Patched handkit: $(basename "$patch")"
+        fi
+    done
+fi
+
 echo "Overlay applied to $target. cd there and run tools/trimui.sh (see docs/trimui.md)."
