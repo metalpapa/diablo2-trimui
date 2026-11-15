@@ -221,6 +221,69 @@ caída de fps tras un portal (buscar `memory tight` en el log).
   loguear voltaje y porcentaje desde `/sys/class/power_supply` si hace falta.
 - Subir `main` a SDL 3.4.20 y zlib 1.3.2 cuando haya sesiones largas sin problemas.
 
+## Experimentos: resultados hasta ahora y qué probar después
+
+Protocolo para comparar binarios: mismo lugar (campamento, parado, sin lluvia),
+2-3 minutos, `show_fps = 1`, y promediar las líneas `alive:` de `d2d.log`
+(`fps`, `render avg`, `present avg`) y `phases`. Sin esto las comparaciones
+se confunden con la lluvia, los paneles abiertos y el calor.
+
+### Resultados medidos en la consola
+
+| Prueba | Resultado |
+|---|---|
+| SDL 3.2.10 a 3.2.30 / 3.4.20 | Funciona con el backend de Handkit sin cambios. El tiempo de dibujado no cambia (CPU); la lluvia se ve más fina y sin tirones. |
+| `scalemode = linear` contra `nearest` | `linear` se ve mejor. El escalado `pixelart` de SDL 3.4 existe pero **no se ha probado**. |
+| Binario sin símbolos | 316 MB a 11 MB; el `.zip` de 78 MB a 5 MB; copia a la SD mucho más rápida. Sin efecto en fps. |
+| Suelo con luz: una escritura de 32 bits por píxel | Mac: 11,5 a 5,7 ms en el benchmark. Consola: render 33-34 a 30-33 ms (5-10 %), menos de lo esperado: no es solo cálculo. |
+| Limpiar el cuadro con 32 bits + lluvia por línea | Render promedio 37,4 a 28 ms; 22,7 a 27 fps en el campamento. |
+| Perfil en el Mac | El suelo con luz era ~65 % del tiempo de CPU; paredes y sprites poco. |
+| Fases en la consola (ms/cuadro, campamento) | limpiar 3,3 · suelo 8-11 · paredes+unidades 4-5 · interfaz 3,5 · copia ancha 2,8 · automapa 1 · presentación 7. Con inventario y baúl abiertos el "post-world" sube a 12-24 ms. |
+| CPU / temperatura / memoria | 2 GHz fijo, gobernador `performance`; 57-67 °C jugando; sin throttling visible. Memoria lenta: llenar 2 MB cuesta ~3 ms. |
+| Memoria tras ir por portal | RSS 324, 489 y luego 649 MB; libre 473 a 175 MB; después del portal 3 fps y presentación de 96 ms (el sistema sin memoria). Arreglo: no precargar con menos de 220 MB libres. **Sin confirmar en la consola.** |
+| LTO | Falla: `libstorm.a` no se puede archivar (el `ar` de Handkit no entiende bitcode). Descartado. |
+| Botón Menu | No llega a SDL: solo aparecen los botones normales. Lo toma el sistema; la salida la da `gptokeyb` desde el launcher. |
+| `-mcpu=cortex_a53` contra genérico | **Nunca se midió aislado** (siempre cambió algo más a la vez). Pendiente. |
+
+### Pendientes de probar (de más a menos prometedor)
+
+1. **Quitar `--widescreen` del launcher** (o `widescreen = 0`). Menos píxeles
+   para suelo, paredes y limpieza, y desaparece la copia ancha: estimado -5 ms
+   por cuadro (~15 % más de fps). Costo: franjas negras a los lados.
+2. **Evitar la copia ancha sin quitar el widescreen**: dibujar la interfaz con
+   desplazamiento directamente en el buffer ancho. Estimado -2,8 ms.
+3. **Medir los ~10 ms que faltan**: la suma de fases da ~24 ms y el render
+   promedio ~34. Falta separar lo que pasa antes de `render_ingame`
+   (`frame_light`, armado de unidades, dibujo del cursor y del contador).
+4. **Interfaz y paneles**: `blit_sprite` y `blit_dcc_frame` aplican gamma por
+   píxel. Una tabla de 32 bits por paleta (como la del suelo) debería bajar la
+   interfaz de 3,5 a ~1,5 ms y los paneles abiertos de 12-24 ms a mucho menos.
+5. **Limpiar solo lo que no cubre el suelo**: estimado -2 ms.
+6. **Paridad de fps con el procesador**: comparar `-mcpu=cortex_a53` contra
+   genérico con el protocolo de arriba; esperado 0-5 %. Si no gana, quitarlo.
+7. **Liberar niveles lejanos** en vez de solo no precargarlos (cada nivel
+   construido son ~30 MB y no se libera nunca). Hay que revisar qué guarda el
+   `World` por nivel antes de borrar uno (punteros `Level*`, monstruos
+   muertos, objetos en el suelo).
+8. **Subida de la textura (7 ms de `present`)**: probar `SDL_LockTexture` para
+   renderizar directo en la textura, o subir solo las filas que cambian. Riesgo:
+   la memoria de la textura puede ser lenta para accesos al azar.
+9. **Escalado `pixelart` de SDL 3.4** (`scalemode = pixelart`): más nítido que
+   `linear` en teoría; solo cuesta tiempo de GPU.
+10. **Aviso de tiempos al cargar un nivel** (primer cuadro 1,5-4 s): medir qué
+    parte es construir el mapa y cuál es leer los MPQ de la SD; quizá ayude
+    guardar una copia de las tablas en un archivo.
+11. **Cierre del juego con `alcSuspendContext`** antes de destruir el contexto
+    de OpenAL para evitar el abort al salir.
+12. **Batería**: loguear voltaje y porcentaje desde `/sys/class/power_supply`
+    junto con la temperatura, para ver a qué voltaje se apaga y qué marcaba.
+
+### Cómo anotar los resultados
+
+Cada prueba nueva: una fila en la tabla de arriba con binario/cambio,
+promedio de fps y de `render`, y la zona usada. Si algo no mejora, dejarlo
+anotado igual (como LTO y el límite de memoria) para no repetirlo.
+
 ## Credits
 
 - [D2Decomp](https://github.com/psi29a/d2decomped) by psi29a and
