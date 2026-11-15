@@ -4,4 +4,5 @@
 	branch = trimui
 [submodule "vendor/handkit"]
 	path = vendor/handkit
-	url = https://github.com/code-beans/handkit.git
+	url = https://github.com/metalpapa/handkit.git
+	branch = experimental/sdl-3.4
