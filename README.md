@@ -1,6 +1,7 @@
 # Diablo II Decomp — TrimUI Smart Pro port layer
 
-Experimental, **unverified on real hardware**, work toward running
+Experimental port layer, booted and play-tested on real TrimUI hardware; memory
+stability is still under investigation. Work toward running
 [D2Decomp](https://github.com/psi29a/d2decomped) — an open-source,
 GPL-3.0-or-later reimplementation of the Diablo II: Lord of Destruction
 1.14d game engine — on the TrimUI Smart Pro / Brick (Allwinner A133P,
@@ -16,7 +17,9 @@ around, and keeps license/attribution unambiguous.
 
 ## Status
 
-Nobody has run this on a TrimUI yet. The cross-compile plan is reasoned from:
+The port has been built and run on a TrimUI Smart Pro with CrossMix OS. It is
+still experimental: long-session memory stability and some controller paths
+need more device testing. The original cross-compile plan was reasoned from:
 
 - D2Decomp's existing PS Vita and Nintendo Switch builds (`tools/d2vita.sh`
   upstream), which already prove the "d2d alone, cross-compiled, SDL3 +
@@ -182,9 +185,12 @@ La SD debe estar conectada y con la etiqueta `CROSSMIX`.
   sola escritura de 32 bits por píxel (`Lighting::rgba`, comparado byte a byte
   con el original en `tests/test_tile_blit.cpp`); limpieza del cuadro y lluvia
   más rápidas. De 22 a 27-32 fps en el campamento.
-- **Memoria:** los niveles construidos nunca se liberan y se precargan todos los
-  vecinos; en 1 GB de RAM la sesión se arrastraba a 3 fps tras ir por un portal.
-  Ahora no se precarga con menos de 220 MB libres.
+- **Memoria:** los niveles construidos todavía no se liberan. Con poca memoria
+  se limita la precarga de destinos de portales; los niveles contiguos que se
+  pueden alcanzar caminando se siguen construyendo. Los píxeles de DT1 lejanos
+  se pueden liberar y recargar; los archivos repetidos ahora comparten una
+  instancia decodificada. Falta validar este último cambio en una sesión larga
+  de TrimUI. Ver [`PLAN-MEJORAS.md`](PLAN-MEJORAS.md).
 
 ### Diagnóstico (lo que escribe `d2d.log`, en `Data/ports/diablo2decomp/.config/d2d/`)
 
@@ -198,13 +204,17 @@ La SD debe estar conectada y con la etiqueta `CROSSMIX`.
 - Medidas del equipo: CPU fija a 2 GHz en `performance`, 57-67 °C jugando,
   la memoria es lenta (cada pasada completa por el cuadro cuesta ~3 ms).
 
-### Sin probar todavía en la consola
+### Validación pendiente en la consola (2026-11-16)
 
-Binario V (el último): mantener A para equipar armas/anillos, B para soltar,
-guardar/sacar del baúl con A, B cierra el árbol de habilidades, esqueletos del
-Nigromante, Game Speed, Menu + Start (el launcher con `gptokeyb`; `launcher.log`
-terminó con `Killed`, que parece ser eso), y que el límite de memoria evite la
-caída de fps tras un portal (buscar `memory tight` en el log).
+- El último caché DT1 redujo el RSS nativo de macOS en ~59 MB al iniciar, pero
+  aún no se ha comparado en una sesión larga de TrimUI.
+- Repetir las transiciones por portales y entre niveles exteriores con el
+  binario actual; comprobar que `rss` no vuelva a crecer hacia el límite y que
+  `memavail` se recupere tras `memory low`.
+- Revisar el arte del pueblo y los bordes de niveles luego de liberar/restaurar
+  tilesets; el pueblo requiere sus rutas DT1 registradas para poder restaurarse.
+- Reprobar el equipamiento con A en el pueblo y confirmar que al atacar con A
+  se interrumpe la repetición del hechizo asignado a B.
 
 ### Pendiente / ideas
 
@@ -213,13 +223,54 @@ caída de fps tras un portal (buscar `memory tight` en el log).
 - Aviso en pantalla cuando falla un guardado (hoy solo va al log).
 - El cierre normal del juego aborta en OpenAL (`double free` al destruir el
   contexto); no afecta al guardado. Idea: `alcSuspendContext` antes de destruir.
-- Liberar niveles lejanos en vez de solo no precargar (requiere revisar el
-  estado por nivel; hoy los niveles construidos se quedan).
+- Si compartir/liberar píxeles DT1 no basta para estabilizar la memoria,
+  investigar liberación de niveles lejanos. Requiere limpiar primero todos los
+  punteros y estados por nivel; hoy los niveles construidos se quedan. Ver el
+  orden de trabajo y sus riesgos en [`PLAN-MEJORAS.md`](PLAN-MEJORAS.md).
 - Optimizar paneles (inventario/baúl cuestan 12-20 ms con todo abierto) y los
   ~10 ms de dibujado que aún no están medidos (antes de `render_ingame`).
 - Calibración de batería: no hay herramienta conocida en CrossMix; se puede
   loguear voltaje y porcentaje desde `/sys/class/power_supply` si hace falta.
 - Subir `main` a SDL 3.4.20 y zlib 1.3.2 cuando haya sesiones largas sin problemas.
+
+## Estado actual y plan de continuación (2026-11-16)
+
+El README se mantiene como contexto para futuras sesiones; el plan accionable
+está en [`PLAN-MEJORAS.md`](PLAN-MEJORAS.md).
+
+- **Memoria, TrimUI:** versiones anteriores llegaron a `rss=750 MB` y
+  `memavail=73 MB` durante el juego; el log terminó en `Killed`. Tras regresar
+  al Campo Pedregoso, el RSS subió de 477 a 750 MB en pocos segundos. Eso
+  demuestra presión de memoria, pero no identifica por sí solo qué componente
+  causó toda la subida.
+- **Tilesets compartidos:** niveles que usan el mismo DT1 comparten una
+  instancia decodificada mediante un caché débil por ruta. En una prueba
+  nativa de 60 s al campamento y vecinos, el RSS bajó de 621 a 562 MB (~59 MB).
+  Es una medida de macOS, no del TrimUI; falta comprobar el ahorro durante una
+  sesión larga en el dispositivo.
+- **Presión de memoria:** se liberan píxeles DT1 de niveles lejanos y se usa
+  `malloc_trim` en Linux/glibc. El arte del nivel activo se restaura completo;
+  el de los vecinos se restaura gradualmente cuando hay más memoria libre.
+  Estas medidas reducen memoria de arte, pero no liberan el resto del estado
+  de niveles ya construidos.
+- **Siguiente verificación:** instalar el último binario desde cero y repetir
+  recorridos entre pueblo, Campo Pedregoso, Bosque Oscuro, Pasaje Subterráneo y
+  Tristram. Revisar `rss`, `memavail`, `memory low`, `art back`, cuadros lentos
+  y si el proceso termina en `Killed`.
+
+### Revisión de AbyssEngine
+
+Se revisó [AbyssEngine](https://github.com/AbyssEngine/AbyssEngine) como
+referencia (2026-11-16). Su README lo describe como una reimplementación
+clean-room en C, no compatible con los saves ni el multijugador originales.
+El árbol actual se centra en escenas de videos introductorios y menú; no se
+encontró implementación de niveles ni DT1. `Sprite_Create` decodifica un DC6
+y crea texturas por instancia; `Scene.c` sí destruye los recursos de una
+escena al cambiarla, pero no implementa streaming ni una caché de assets. Su
+MPQ reader todavía marca como TODO los archivos patch y single-unit. Por eso
+no hay código de carga de niveles que convenga portar. La idea general útil es
+la propiedad y liberación explícitas de recursos; el diseño de niveles y el
+caché DT1 de este proyecto siguen siendo propios.
 
 ## Experimentos: resultados hasta ahora y qué probar después
 
@@ -240,7 +291,8 @@ se confunden con la lluvia, los paneles abiertos y el calor.
 | Perfil en el Mac | El suelo con luz era ~65 % del tiempo de CPU; paredes y sprites poco. |
 | Fases en la consola (ms/cuadro, campamento) | limpiar 3,3 · suelo 8-11 · paredes+unidades 4-5 · interfaz 3,5 · copia ancha 2,8 · automapa 1 · presentación 7. Con inventario y baúl abiertos el "post-world" sube a 12-24 ms. |
 | CPU / temperatura / memoria | 2 GHz fijo, gobernador `performance`; 57-67 °C jugando; sin throttling visible. Memoria lenta: llenar 2 MB cuesta ~3 ms. |
-| Memoria tras ir por portal | RSS 324, 489 y luego 649 MB; libre 473 a 175 MB; después del portal 3 fps y presentación de 96 ms (el sistema sin memoria). Arreglo: no precargar con menos de 220 MB libres. **Sin confirmar en la consola.** |
+| Memoria antes de compartir DT1 | En una sesión de TrimUI, RSS pasó de 477 a 750 MB y MemAvailable de 355 a 73 MB al volver al Campo Pedregoso; el proceso acabó en `Killed`. Presión de memoria confirmada; origen exacto de toda la subida no aislado. |
+| Caché compartido de DT1 | Prueba nativa en macOS, campamento + vecinos durante 60 s: RSS de 621 a 562 MB. Falta A/B y prueba larga en TrimUI. |
 | LTO | Falla: `libstorm.a` no se puede archivar (el `ar` de Handkit no entiende bitcode). Descartado. |
 | Botón Menu | No llega a SDL: solo aparecen los botones normales. Lo toma el sistema; la salida la da `gptokeyb` desde el launcher. |
 | `-mcpu=cortex_a53` contra genérico | **Nunca se midió aislado** (siempre cambió algo más a la vez). Pendiente. |
