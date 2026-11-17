@@ -46,13 +46,13 @@ The packaged output is written to `upstream/build/trimui-pak/`. For installation
 From the repository root:
 
 ```sh
-make backup   # save/config/log backup only; requires mounted CROSSMIX volume
+make backup   # save/config/log backup to this Mac; requires CROSSMIX and sudo
 make build    # compile and package; does not access the SD card
 make copy     # backup, then copy binary, launcher and box art to CROSSMIX
 make update   # build/package, then backup and copy to CROSSMIX
 ```
 
-`make build` does not access the SD card. `make copy` and `make update` back up saves/config/logs first; they leave the MPQ data and save files untouched. `make update` requires the SD volume to be mounted as `CROSSMIX`.
+`make build` does not access the SD card. `make backup` reads saves/config/logs from the SD with mtools and stores a checksummed copy on this Mac. `make copy` and `make update` run that backup first; they leave MPQ data and save files on the card untouched. The SD must be connected and identifiable as `CROSSMIX`; raw mtools access may request your macOS sudo password.
 
 Backups go to `~/Documents/diablo2-trimui-backups/` in timestamped folders with SHA-256 checksums.
 

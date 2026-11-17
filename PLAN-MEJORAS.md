@@ -82,6 +82,7 @@ With `show_fps = 1`, the screen shows FPS and battery percentage when Linux expo
 
 - `alive`: FPS, average render, and present times every five seconds.
 - `phases`: clear, floor/shadow, walls/units, post-world, HUD, rain, labels, widescreen copy, and automap timing.
+- `simulation`: every five seconds, average and maximum milliseconds per world turn for total simulation, level preparation, monster fight/AI, and room activation, plus the current monster and room counts. These timings exclude client rendering and presentation.
 - `sys`: CPU frequency/governor, temperature, `memavail`, RSS, and load.
 - `pad button` / `joystick button`: inputs received by the game.
 

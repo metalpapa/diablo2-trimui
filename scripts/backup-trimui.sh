@@ -1,20 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-volume=/Volumes/CROSSMIX
-user_dir="$volume/Data/ports/diablo2decomp/.config/d2d"
+volume=CROSSMIX
+sd_user='::/Data/ports/diablo2decomp/.config/d2d'
 backup_root="$HOME/Documents/diablo2-trimui-backups"
 
-if [[ ! -d "$user_dir/save" ]]; then
-    printf 'TrimUI save directory not found at %s. Mount the CROSSMIX volume first.\n' "$user_dir" >&2
+device=$(diskutil info "$volume" 2>/dev/null | awk -F': *' '/Device Node/ {print $2}' || true)
+if [[ -z "$device" ]]; then
+    printf 'TrimUI SD card (CROSSMIX) not found. Connect it first.\n' >&2
     exit 1
 fi
+raw_device=$(printf '%s\n' "$device" | sed 's#/dev/disk#/dev/rdisk#')
 
 mkdir -p "$backup_root"
 backup=$(mktemp -d "$backup_root/$(date +%Y%m%d-%H%M%S)-before-session.XXXXXX")
-ditto "$user_dir/save" "$backup/save"
+mkdir -p "$backup/save"
+sudo -v
+sudo mdir -i "$raw_device" "$sd_user/save" >/dev/null
+sudo mcopy -s -i "$raw_device" "$sd_user/save/*" "$backup/save/" </dev/null
+
 for file in d2d.cfg d2d.log launcher.log; do
-    if [[ -f "$user_dir/$file" ]]; then ditto "$user_dir/$file" "$backup/$file"; fi
+    if sudo mdir -i "$raw_device" "$sd_user/$file" >/dev/null 2>&1; then
+        sudo mcopy -i "$raw_device" "$sd_user/$file" "$backup/$file" </dev/null
+    fi
 done
 
 {
@@ -26,4 +34,4 @@ done
 
 find "$backup" -type f ! -name SHA256SUMS.txt -print0 | xargs -0 shasum -a 256 > "$backup/SHA256SUMS.txt"
 printf 'Backup complete: %s\n' "$backup"
-printf 'Contents: save/, d2d.cfg, d2d.log, launcher.log, manifest, SHA256SUMS.txt (when present)\n'
+printf 'Contents copied to this Mac: save/, d2d.cfg, d2d.log, launcher.log, manifest, SHA256SUMS.txt (when present)\n'

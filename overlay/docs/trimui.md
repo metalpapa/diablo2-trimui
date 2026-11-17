@@ -53,7 +53,7 @@ tools/trimui.sh all      # build + package, into build/trimui-pak/
 
 ## Repeatable build and backup scripts
 
-From the repository root, use `make backup`, `make build`, `make copy`, or `make update`. Backups go to a timestamped folder under `~/Documents/diablo2-trimui-backups/` with checksums. `make build` never accesses the SD card; `make copy` and `make update` back up saves/config/logs, then copy the binary, launcher, and box art. They do not copy MPQs or overwrite save files. `make update` requires the SD volume to be mounted as `CROSSMIX`.
+From the repository root, use `make backup`, `make build`, `make copy`, or `make update`. Backups are read from the raw SD device with mtools and stored in a timestamped, checksummed folder under `~/Documents/diablo2-trimui-backups/` on the Mac. `make build` never accesses the SD card; `make copy` and `make update` back up saves/config/logs first, then copy the binary, launcher, and box art. They do not copy MPQs or overwrite save files. The SD must be connected and identifiable as `CROSSMIX`; mtools may prompt for sudo access.
 
 ## Where its files go
 
@@ -121,6 +121,7 @@ SD); copy them to `Imgs/PORTS/Diablo II Decomp.png` and
 - Hold Menu + Start (or Select + Start) for a second: leave at once without saving (any screen).
 - `game_speed = 0..10`: the Video Options slider (Start > Options > Video Options > Game Speed), 5 = normal, 0.5x to 1.5x; the game clock runs at that rate in single player.
 - `show_fps = 1`: frames per second and battery percentage, top left (`--%` if the system does not expose a battery capacity). Render and present timings remain in `d2d.log`.
+- `d2d.log` reports simulation timing every five seconds: average and maximum milliseconds per world turn for total simulation, level preparation, fight/AI, and room activation, plus monster and room counts. These are separate from render/present timings.
 - Optional challenge switches are in Pause > Options > Challenge Options: harder monsters, more monsters in newly populated rooms, more class-usable equipment from elite monsters, and hiding gold/potion labels. All are off by default and stored in `d2d.cfg`; they do not change the save's Normal/Nightmare/Hell campaign difficulty. Harder Monsters means +50% monster life and +25% combat stats; More Monsters raises room spawn density by 50%. Test the balance before using them on a valued character.
 - `automap_items = 1`: the automap key (R1 by default) also shows/hides the
   names of items on the ground.
