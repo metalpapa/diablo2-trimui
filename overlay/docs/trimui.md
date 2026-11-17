@@ -1,7 +1,8 @@
 # d2d for the TrimUI Smart Pro / Brick
 
-Status: **experimental, unverified on real hardware.** Written as a starting
-point for a port, not a support claim (docs/design/platform-support.md's
+Status: **experimental; booted and play-tested on a real TrimUI Smart Pro
+with CrossMix OS.** Long-session memory stability and some controls remain
+unverified; this is not a support claim (docs/design/platform-support.md's
 rules apply here too: a successful cross-compile is not "supported").
 
 d2d built for the TrimUI's AArch64 (Allwinner A133P, PowerVR GE8300) through
@@ -49,6 +50,10 @@ Then, in this repo:
 export HANDKIT_SDK=/path/to/handkit
 tools/trimui.sh all      # build + package, into build/trimui-pak/
 ```
+
+## Repeatable build and backup scripts
+
+From the repository root, use `make backup`, `make build`, `make copy`, or `make update`. Backups go to a timestamped folder under `~/Documents/diablo2-trimui-backups/` with checksums. `make build` never accesses the SD card; `make copy` and `make update` back up saves/config/logs, then copy the binary, launcher, and box art. They do not copy MPQs or overwrite save files. `make update` requires the SD volume to be mounted as `CROSSMIX`.
 
 ## Where its files go
 
@@ -115,7 +120,8 @@ SD); copy them to `Imgs/PORTS/Diablo II Decomp.png` and
   the es-ES release; upstream always read `ENG`.
 - Hold Menu + Start (or Select + Start) for a second: leave at once without saving (any screen).
 - `game_speed = 0..10`: the Video Options slider (Start > Options > Video Options > Game Speed), 5 = normal, 0.5x to 1.5x; the game clock runs at that rate in single player.
-- `show_fps = 1`: frames a second and render ms, top left.
+- `show_fps = 1`: frames per second and battery percentage, top left (`--%` if the system does not expose a battery capacity). Render and present timings remain in `d2d.log`.
+- Optional challenge switches are in Pause > Options > Challenge Options: harder monsters, more monsters in newly populated rooms, more class-usable equipment from elite monsters, and hiding gold/potion labels. All are off by default and stored in `d2d.cfg`; they do not change the save's Normal/Nightmare/Hell campaign difficulty. Harder Monsters means +50% monster life and +25% combat stats; More Monsters raises room spawn density by 50%. Test the balance before using them on a valued character.
 - `automap_items = 1`: the automap key (R1 by default) also shows/hides the
   names of items on the ground.
 - `patch = <path>`: an extra MPQ layered on top (used for the "Save" menu
@@ -194,17 +200,15 @@ tracks the window's own aspect, so a 4:3 window computes right back to the
 unwidened 800x600 (a no-op) and the Smart Pro's 16:9 fills the screen --
 safe and correct on either model.
 
-## Not there yet (first things to find out on real hardware)
+## Remaining device checks
 
-- It hasn't run on a TrimUI. Expect at least one round of fixes: shared-
-  library paths, the exact PowerVR/Mali EGL alias Handkit's SDL3 picks,
-  default resolution/scale on the device's panel, stick/button mapping
-  through `apps/d2d/gamepad_map.hpp`.
-- Performance is untested. d2d's CPU-rendered framebuffer should be light
-  for a Cortex-A53 quad-core (the reference game is from 2000), but only a
-  run on the device confirms it.
-- Network (LAN/TCP·IP join) is expected to work — this is real Linux, not
-  a sandboxed console SDK like the Vita/Switch builds — but is untested here.
+- Boot and basic gameplay have been verified on a Smart Pro with CrossMix OS.
+  Long-session memory stability remains open; an earlier run reached 750 MB
+  RSS and ended in `Killed`.
+- Performance has been measured in short device runs. Further A/B tests are
+  needed for scaling, widescreen, open panels, and CPU tuning.
+- Some controller paths still need device testing. Network (LAN/TCP/IP join)
+  is expected to work on Linux but is untested here.
 - No real icon/art for the bundled `diablo2decomp-icon.png` itself (a
   plain placeholder monogram is included — see above — but nothing using
   actual D2 assets, which LEGAL.md rules out anyway). The Ports-list
