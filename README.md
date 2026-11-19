@@ -14,7 +14,7 @@ This repository keeps TrimUI build and packaging changes separate from the D2Dec
 - The latest device log has no out-of-memory kill, but ends with an unexplained segmentation fault after a save; see the engineering log for details.
 - The shared DT1 cache reduced memory use in a short native macOS run; the same benefit still needs confirmation during a long TrimUI session.
 
-See [PLAN-MEJORAS.md](PLAN-MEJORAS.md) for priorities, session notes, measurements, and open issues. Build, install, and device details are in [overlay/docs/trimui.md](overlay/docs/trimui.md).
+See [PLAN-MEJORAS.md](PLAN-MEJORAS.md) for priorities, session notes, measurements, and open issues. Build, install, and device details are in [overlay/docs/trimui.md](overlay/docs/trimui.md). Agents should start with [AGENTS.md](AGENTS.md) for repository rules and coordination.
 
 ## Features
 

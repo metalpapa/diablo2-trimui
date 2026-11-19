@@ -1,0 +1,6 @@
+# Agent guide for the TrimUI port
+
+- Start with [the README](README.md) for scope and build commands. Read the relevant section of [the improvement plan](PLAN-MEJORAS.md) for prior findings, reproduction steps, and active work before re-investigating an issue.
+- The root contains packaging, the overlay, and the SD workflow. The game engine is the [upstream submodule](upstream/README.md). Before editing it, read [upstream's agent rules](upstream/AGENTS.md), especially section 7 (House style), and its [contribution guide](upstream/CONTRIBUTING.md). Preserve its comment conventions; put investigation notes, dates, and agent attribution in the plan, not in source comments.
+- When agents work in parallel, check the plan and the diffs in both repositories. Record the functions you intend to change before editing, avoid overlapping work, and record what was verified and what remains uncertain afterward.
+- See the [TrimUI guide](overlay/docs/trimui.md) for packaging, [PortMaster notes](PORTMASTER-NOTES.md) for SD access, and [upstream's test guide](upstream/tests/README.md) for validation. A data-dependent test that skips is not a pass. Build only with `make build`; copying to the SD and restoring saves are separate operations.
