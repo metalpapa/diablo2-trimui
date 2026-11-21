@@ -1,6 +1,19 @@
 # Improvement Plan and Engineering Log
 
-Last updated: 2026-11-20. The port has booted and been play-tested on a TrimUI Smart Pro with CrossMix OS. It remains experimental: memory stability during long sessions is not confirmed. The user-facing overview is in [README.md](README.md); setup details are in [overlay/docs/trimui.md](overlay/docs/trimui.md).
+Last updated: 2026-11-21. The port has booted and been play-tested on a TrimUI Smart Pro with CrossMix OS. It remains experimental: memory stability during long sessions is not confirmed. The user-facing overview is in [README.md](README.md); setup details are in [overlay/docs/trimui.md](overlay/docs/trimui.md).
+
+## Project principle (decided 2026-11-21, do not lose this)
+
+This fork does **not** require parity with the original game.exe. That's
+upstream D2Decomp's house rule for its own shared, public project (see
+upstream/AGENTS.md section 7) -- it is explicitly not a goal here. This is a
+personal fork the owner plays for themselves on their own TrimUI Smart Pro.
+When something gets in the way of a good solo experience -- a bug, an
+annoying vanilla mechanic, a rough edge -- fix it for the better experience.
+Do not block or water down a fix by citing "but the original game did it
+that way." Every session should read this before touching combat/AI code
+that's commented as RE-matched; it explains why past entries below are
+cautious about parity and is the reason future ones don't need to be.
 
 ## Priorities
 
